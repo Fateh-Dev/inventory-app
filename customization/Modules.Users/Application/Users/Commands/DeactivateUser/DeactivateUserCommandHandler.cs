@@ -23,6 +23,11 @@ public class DeactivateUserCommandHandler : IRequestHandler<DeactivateUserComman
             return Result.Failure(Error.NotFound("User.NotFound", "User not found."));
         }
 
+        if (user.Username.Equals("admin", System.StringComparison.OrdinalIgnoreCase))
+        {
+            return Result.Failure(Error.Validation("User.AdminDeactivationNotAllowed", "The default admin user cannot be deactivated."));
+        }
+
         user.Deactivate();
         await _context.SaveChangesAsync(cancellationToken);
 

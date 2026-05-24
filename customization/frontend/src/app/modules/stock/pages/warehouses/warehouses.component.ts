@@ -45,7 +45,14 @@ import { WarehouseDto } from '../../models/stock.models';
             <div class="card" style="cursor:default;">
               <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
                 <div style="display:flex; align-items:center; gap:12px;">
-                  <div style="width:42px;height:42px;background:rgba(14,165,233,0.12);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;">🏭</div>
+                  <div style="width:42px;height:42px;background:rgba(14,165,233,0.12);border-radius:10px;display:flex;align-items:center;justify-content:center;">
+                    <svg style="width: 22px; height: 22px;" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 21h18" />
+                      <path d="M3 7v14h18V7L12 3z" />
+                      <path d="M12 21v-8" />
+                      <path d="M8 21v-4h8v4" />
+                    </svg>
+                  </div>
                   <div>
                     <div style="font-size:15px;font-weight:700;color:var(--text-primary)">{{ wh.name }}</div>
                     <div style="font-size:11.5px;font-family:monospace;color:var(--accent);background:rgba(14,165,233,0.08);padding:1px 6px;border-radius:4px;display:inline-block;margin-top:2px;">
@@ -99,7 +106,7 @@ import { WarehouseDto } from '../../models/stock.models';
         <div class="modal-overlay" (click)="closeModal()">
           <div class="modal-panel" style="max-width:580px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">{{ editItem() ? 'Modifier l\'entrepôt' : 'Nouvel entrepôt' }}</h2>
+              <h2 class="modal-title">{{ editItem() ? "Modifier l'entrepôt" : "Nouvel entrepôt" }}</h2>
               <button class="modal-close" (click)="closeModal()"><i class="pi pi-times"></i></button>
             </div>
             <div class="modal-body">

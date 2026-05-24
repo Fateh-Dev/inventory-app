@@ -36,6 +36,11 @@ public class UpdateUserCommandHandler : IRequestHandler<UpdateUserCommand, Resul
             return Result<UserDto>.Failure(Error.Conflict("User.EmailConflict", "Email is already in use."));
         }
 
+        if (user.Username.Equals("admin", System.StringComparison.OrdinalIgnoreCase) && request.Role != Domain.Enums.UserRole.Admin)
+        {
+            return Result<UserDto>.Failure(Error.Validation("User.AdminRoleChangeNotAllowed", "The role of the default admin user cannot be changed."));
+        }
+
         user.Update(request.Email, request.FullName, request.Role);
 
         if (!string.IsNullOrWhiteSpace(request.Password))

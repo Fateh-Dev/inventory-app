@@ -22,7 +22,7 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
       <div class="filter-bar">
         <div class="search-box">
           <i class="pi pi-search"></i>
-          <input class="search-input" [(ngModel)]="search" placeholder="Rechercher par nom ou e-mail…" (ngModelChange)="applyFilter()">
+          <input class="search-input" [(ngModel)]="search" placeholder="Rechercher par nom ou e-mail…" (ngModelChange)="applyFilter()" autocomplete="off" name="user-search">
         </div>
       </div>
 
@@ -88,7 +88,7 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
                       <button class="btn btn-secondary btn-sm" (click)="openEdit(u)" title="Modifier">
                         <i class="pi pi-pencil"></i>
                       </button>
-                      @if (u.id !== currentUser()?.id) {
+                      @if (u.id !== currentUser()?.id && u.username !== 'admin') {
                         @if (u.isActive) {
                           <button class="btn btn-danger btn-sm" (click)="toggleActive(u)" title="Désactiver">
                             <i class="pi pi-ban"></i>
@@ -113,7 +113,7 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
         <div class="modal-overlay" (click)="closeModal()">
           <div class="modal-panel" style="max-width:550px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">{{ editItem() ? 'Modifier l\'utilisateur' : 'Nouvel utilisateur' }}</h2>
+              <h2 class="modal-title">{{ editItem() ? "Modifier l'utilisateur" : "Nouvel utilisateur" }}</h2>
               <button class="modal-close" (click)="closeModal()"><i class="pi pi-times"></i></button>
             </div>
             <div class="modal-body">
@@ -131,7 +131,7 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
 
               <div class="form-group">
                 <label class="form-label">Nom d'utilisateur *</label>
-                <input class="form-input" [(ngModel)]="form.username" [disabled]="!!editItem()" placeholder="Ex. fadmin">
+                <input class="form-input" [(ngModel)]="form.username" [disabled]="!!editItem()" placeholder="Ex. fadmin" autocomplete="new-username" name="username">
                 @if (editItem()) {
                   <span class="field-help">Le nom d'utilisateur ne peut pas être modifié.</span>
                 }
@@ -145,7 +145,7 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
               <div class="form-grid">
                 <div class="form-group">
                   <label class="form-label">Rôle *</label>
-                  <select class="form-select" [(ngModel)]="form.role">
+                  <select class="form-select" [(ngModel)]="form.role" [disabled]="form.username === 'admin'">
                     <option value="Admin">Admin</option>
                     <option value="Manager">Manager</option>
                     <option value="Worker">Worker</option>
@@ -154,7 +154,7 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
 
                 <div class="form-group">
                   <label class="form-label">Mot de passe {{ editItem() ? '(Optionnel)' : '*' }}</label>
-                  <input class="form-input" type="password" [(ngModel)]="form.password" placeholder="{{ editItem() ? 'Laisser vide pour ne pas modifier' : '••••••••' }}">
+                  <input class="form-input" type="password" [(ngModel)]="form.password" placeholder="{{ editItem() ? 'Laisser vide pour ne pas modifier' : '••••••••' }}" autocomplete="new-password" name="password">
                 </div>
               </div>
             </div>
