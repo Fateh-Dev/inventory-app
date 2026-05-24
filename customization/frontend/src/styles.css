@@ -114,6 +114,68 @@ html, body {
   overflow: hidden;
 }
 
+/* Collapsible Sidebar States */
+.sidebar.collapsed {
+  width: 68px;
+  min-width: 68px;
+}
+
+.sidebar.collapsed .brand-logo > div:last-child,
+.sidebar.collapsed .nav-item span,
+.sidebar.collapsed .nav-label,
+.sidebar.collapsed .profile-details,
+.sidebar.collapsed .sidebar-footer-btn span {
+  display: none !important;
+}
+
+.sidebar.collapsed .sidebar-brand {
+  padding: 20px 14px 16px;
+}
+
+.sidebar.collapsed .brand-logo {
+  justify-content: center;
+}
+
+.sidebar.collapsed .nav-section {
+  padding: 16px 8px 8px;
+}
+
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 9px 0;
+}
+
+.sidebar.collapsed .nav-item .pi {
+  font-size: 16px;
+  margin: 0;
+  width: auto;
+}
+
+.sidebar.collapsed .nav-badge {
+  position: absolute;
+  top: 6px;
+  right: 12px;
+  margin-left: 0;
+  font-size: 9px;
+  padding: 1px 4px;
+  min-width: 14px;
+}
+
+.sidebar.collapsed .nav-item {
+  position: relative;
+}
+
+.sidebar.collapsed .sidebar-footer {
+  padding: 16px 8px;
+  align-items: center;
+}
+
+.sidebar.collapsed .sidebar-footer-btn {
+  padding: 8px 0;
+  justify-content: center;
+}
+
+
 .main-content {
   flex: 1;
   display: flex;
