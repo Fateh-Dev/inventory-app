@@ -46,7 +46,28 @@ public class GetAllMovementsQueryHandler : IRequestHandler<GetAllMovementsQuery,
         if (request.ToDate.HasValue)
             query = query.Where(m => m.MovementDate <= request.ToDate.Value);
 
-        var movements = await query.OrderByDescending(m => m.MovementDate).ToListAsync(cancellationToken);
+        if (!string.IsNullOrWhiteSpace(request.SearchTerm))
+        {
+            var term = request.SearchTerm.Trim().ToLower();
+            query = query.Where(m => m.MovementNumber.ToLower().Contains(term) || (m.Reference != null && m.Reference.ToLower().Contains(term)));
+        }
+
+        query = query.OrderByDescending(m => m.MovementDate);
+
+        if (request.PageNumber.HasValue && request.PageSize.HasValue)
+        {
+            int pageNumber = request.PageNumber.Value;
+            int pageSize = request.PageSize.Value;
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize < 1) pageSize = 10;
+            query = query.Skip((pageNumber - 1) * pageSize).Take(pageSize);
+        }
+        else
+        {
+            query = query.Take(100); // Safe fallback limit
+        }
+
+        var movements = await query.ToListAsync(cancellationToken);
 
         // Map directly without full joining to Warehouses/Suppliers names to keep it simple, or we could fetch names.
         // For simplicity we will leave Names null if not specifically requested with a heavy join.

@@ -41,13 +41,34 @@ public class GetAllStockItemsQueryHandler : IRequestHandler<GetAllStockItemsQuer
             query = query.Where(i => i.HasExpiryDate);
         }
 
-        var items = await query.ToListAsync(cancellationToken);
-
-        // Client-side filtering for computed properties
         if (request.LowStockOnly.HasValue && request.LowStockOnly.Value)
         {
-            items = items.Where(i => i.IsLowStock).ToList();
+            var today = System.DateTime.UtcNow.Date;
+            query = query.Where(i => i.Lots.Where(l => !(l.ExpiryDate != null && l.ExpiryDate.Value.Date <= today)).Sum(l => l.CurrentQuantity.Value) <= i.DefaultLowStockThreshold);
         }
+
+        if (!string.IsNullOrWhiteSpace(request.SearchTerm))
+        {
+            var term = request.SearchTerm.Trim().ToLower();
+            query = query.Where(i => i.Name.ToLower().Contains(term) || i.Reference.ToLower().Contains(term));
+        }
+
+        query = query.OrderBy(i => i.Reference);
+
+        if (request.PageNumber.HasValue && request.PageSize.HasValue)
+        {
+            int pageNumber = request.PageNumber.Value;
+            int pageSize = request.PageSize.Value;
+            if (pageNumber < 1) pageNumber = 1;
+            if (pageSize < 1) pageSize = 10;
+            query = query.Skip((pageNumber - 1) * pageSize).Take(pageSize);
+        }
+        else
+        {
+            query = query.Take(100); // Safe fallback limit
+        }
+
+        var items = await query.ToListAsync(cancellationToken);
 
         // We also need SupplierName. Ideally join, but let's fetch dictionary or join.
         var supplierIds = items.Where(i => i.DefaultSupplierId.HasValue).Select(i => i.DefaultSupplierId.Value).Distinct().ToList();

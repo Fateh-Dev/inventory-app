@@ -32,17 +32,17 @@ const UNIT_FR: Record<string, string> = {
       <div class="filter-bar">
         <div class="search-box">
           <i class="pi pi-search"></i>
-          <input class="search-input" [(ngModel)]="search" placeholder="Rechercher par nom ou référence…" (ngModelChange)="applyFilter()">
+          <input class="search-input" [(ngModel)]="search" placeholder="Rechercher par nom ou référence…" (ngModelChange)="onSearchChange()">
         </div>
-        <select class="form-select" style="width:180px" [(ngModel)]="filterCategoryId" (change)="load()">
+        <select class="form-select" style="width:180px" [(ngModel)]="filterCategoryId" (change)="onFilterChange()">
           <option value="">Toutes les catégories</option>
           @for (c of categories(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
         </select>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer;">
-          <input type="checkbox" [(ngModel)]="filterLowStock" (change)="load()"> Stock faible uniquement
+          <input type="checkbox" [(ngModel)]="filterLowStock" (change)="onFilterChange()"> Stock faible uniquement
         </label>
         <label style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);cursor:pointer;">
-          <input type="checkbox" [(ngModel)]="filterActive" (change)="load()"> Actifs uniquement
+          <input type="checkbox" [(ngModel)]="filterActive" (change)="onFilterChange()"> Actifs uniquement
         </label>
       </div>
 
@@ -123,6 +123,17 @@ const UNIT_FR: Record<string, string> = {
               }
             </tbody>
           </table>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-top:1px solid var(--border); background:var(--bg-base);">
+            <span style="font-size:13px; color:var(--text-muted);">Page {{ pageNumber() }}</span>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-secondary btn-sm" [disabled]="pageNumber() <= 1" (click)="prevPage()">
+                <i class="pi pi-chevron-left"></i> Précédent
+              </button>
+              <button class="btn btn-secondary btn-sm" [disabled]="!hasMore()" (click)="nextPage()">
+                Suivant <i class="pi pi-chevron-right"></i>
+              </button>
+            </div>
+          </div>
         }
       </div>
 
@@ -292,6 +303,10 @@ export class StockItemsComponent implements OnInit {
   filterLowStock = false;
   filterActive = true;
 
+  pageNumber = signal(1);
+  pageSize = signal(25);
+  hasMore = signal(true);
+
   units = UNITS;
   form: any = {};
 
@@ -325,24 +340,47 @@ export class StockItemsComponent implements OnInit {
     this.stockService.getStockItems({
       categoryId: this.filterCategoryId || undefined,
       activeOnly: this.filterActive || undefined,
-      lowStockOnly: this.filterLowStock || undefined
+      lowStockOnly: this.filterLowStock || undefined,
+      searchTerm: this.search || undefined,
+      pageNumber: this.pageNumber(),
+      pageSize: this.pageSize()
     }).subscribe({
       next: (items) => {
         this.items.set(items);
         this.applyFilter();
         this.loading.set(false);
+        this.hasMore.set(items.length >= this.pageSize());
       },
       error: () => this.loading.set(false)
     });
   }
 
   applyFilter() {
-    const q = this.search.toLowerCase();
-    this.filtered.set(
-      this.items().filter(i =>
-        !q || i.name.toLowerCase().includes(q) || i.reference.toLowerCase().includes(q)
-      )
-    );
+    this.filtered.set(this.items());
+  }
+
+  onSearchChange() {
+    this.pageNumber.set(1);
+    this.load();
+  }
+
+  onFilterChange() {
+    this.pageNumber.set(1);
+    this.load();
+  }
+
+  prevPage() {
+    if (this.pageNumber() > 1) {
+      this.pageNumber.update(p => p - 1);
+      this.load();
+    }
+  }
+
+  nextPage() {
+    if (this.hasMore()) {
+      this.pageNumber.update(p => p + 1);
+      this.load();
+    }
   }
 
   openCreate() {

@@ -33,9 +33,9 @@ const STATUS_FR: Record<string, string> = {
       <div class="filter-bar">
         <div class="search-box" style="max-width:200px;">
           <i class="pi pi-search"></i>
-          <input class="search-input" [(ngModel)]="search" placeholder="N° mouvement…" (ngModelChange)="applyFilter()">
+          <input class="search-input" [(ngModel)]="search" placeholder="N° mouvement…" (ngModelChange)="onSearchChange()">
         </div>
-        <select class="form-select" style="width:170px" [(ngModel)]="filterType" (change)="load()">
+        <select class="form-select" style="width:170px" [(ngModel)]="filterType" (change)="onFilterChange()">
           <option value="">Tous les types</option>
           <option value="Reception">Réception</option>
           <option value="Issue">Sortie</option>
@@ -44,14 +44,14 @@ const STATUS_FR: Record<string, string> = {
           <option value="Adjustment">Ajustement</option>
           <option value="Disposal">Mise au rebut</option>
         </select>
-        <select class="form-select" style="width:160px" [(ngModel)]="filterStatus" (change)="load()">
+        <select class="form-select" style="width:160px" [(ngModel)]="filterStatus" (change)="onFilterChange()">
           <option value="">Tous les statuts</option>
           <option value="Pending">En attente</option>
           <option value="Confirmed">Confirmé</option>
           <option value="Cancelled">Annulé</option>
         </select>
-        <input class="form-input" type="date" [(ngModel)]="fromDate" (change)="load()" style="width:150px" title="Date de début">
-        <input class="form-input" type="date" [(ngModel)]="toDate" (change)="load()" style="width:150px" title="Date de fin">
+        <input class="form-input" type="date" [(ngModel)]="fromDate" (change)="onFilterChange()" style="width:150px" title="Date de début">
+        <input class="form-input" type="date" [(ngModel)]="toDate" (change)="onFilterChange()" style="width:150px" title="Date de fin">
       </div>
 
       <div class="card" style="padding:0;overflow:hidden;">
@@ -108,6 +108,17 @@ const STATUS_FR: Record<string, string> = {
               }
             </tbody>
           </table>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-top:1px solid var(--border); background:var(--bg-base);">
+            <span style="font-size:13px; color:var(--text-muted);">Page {{ pageNumber() }}</span>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-secondary btn-sm" [disabled]="pageNumber() <= 1" (click)="prevPage()">
+                <i class="pi pi-chevron-left"></i> Précédent
+              </button>
+              <button class="btn btn-secondary btn-sm" [disabled]="!hasMore()" (click)="nextPage()">
+                Suivant <i class="pi pi-chevron-right"></i>
+              </button>
+            </div>
+          </div>
         }
       </div>
 
@@ -421,6 +432,10 @@ export class MovementsComponent implements OnInit {
   filterStatus = '';
   fromDate = '';
   toDate = '';
+
+  pageNumber = signal(1);
+  pageSize = signal(25);
+  hasMore = signal(true);
   createForm: any = {};
 
   ngOnInit() {
@@ -435,9 +450,17 @@ export class MovementsComponent implements OnInit {
       status: this.filterStatus || undefined,
       fromDate: this.fromDate || undefined,
       toDate: this.toDate || undefined,
-      includeLines: true
+      includeLines: true,
+      searchTerm: this.search || undefined,
+      pageNumber: this.pageNumber(),
+      pageSize: this.pageSize()
     }).subscribe({
-      next: (items) => { this.items.set(items); this.applyFilter(); this.loading.set(false); },
+      next: (items) => {
+        this.items.set(items);
+        this.applyFilter();
+        this.loading.set(false);
+        this.hasMore.set(items.length >= this.pageSize());
+      },
       error: () => this.loading.set(false)
     });
   }
@@ -446,12 +469,35 @@ export class MovementsComponent implements OnInit {
     this.stockService.getSuppliers(true).subscribe(data => this.suppliers.set(data));
     this.stockService.getWarehouses(true).subscribe(data => this.warehouses.set(data));
     this.stockService.getDepartments(true).subscribe(data => this.departments.set(data));
-    this.stockService.getStockItems({ activeOnly: true }).subscribe(data => this.stockItems.set(data));
+    this.stockService.getStockItems({ activeOnly: true, pageSize: 100000 }).subscribe(data => this.stockItems.set(data));
   }
 
   applyFilter() {
-    const q = this.search.toLowerCase();
-    this.filtered.set(this.items().filter(i => !q || i.movementNumber.toLowerCase().includes(q)));
+    this.filtered.set(this.items());
+  }
+
+  onSearchChange() {
+    this.pageNumber.set(1);
+    this.load();
+  }
+
+  onFilterChange() {
+    this.pageNumber.set(1);
+    this.load();
+  }
+
+  prevPage() {
+    if (this.pageNumber() > 1) {
+      this.pageNumber.update(p => p - 1);
+      this.load();
+    }
+  }
+
+  nextPage() {
+    if (this.hasMore()) {
+      this.pageNumber.update(p => p + 1);
+      this.load();
+    }
   }
 
   openCreate() {

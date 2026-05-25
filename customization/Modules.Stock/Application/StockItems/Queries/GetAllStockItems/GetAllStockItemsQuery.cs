@@ -10,5 +10,8 @@ public record GetAllStockItemsQuery(
     Guid? CategoryId = null,
     bool? ActiveOnly = null,
     bool? LowStockOnly = null,
-    bool? HasExpiryOnly = null
+    bool? HasExpiryOnly = null,
+    string? SearchTerm = null,
+    int? PageNumber = null,
+    int? PageSize = null
 ) : IRequest<Result<IEnumerable<StockItemDto>>>;

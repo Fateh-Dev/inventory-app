@@ -90,12 +90,18 @@ export class StockService {
     activeOnly?: boolean;
     lowStockOnly?: boolean;
     hasExpiryOnly?: boolean;
+    searchTerm?: string;
+    pageNumber?: number;
+    pageSize?: number;
   }): Observable<StockItemDto[]> {
     let params = new HttpParams();
     if (filters?.categoryId) params = params.set('categoryId', filters.categoryId);
     if (filters?.activeOnly !== undefined) params = params.set('activeOnly', filters.activeOnly);
     if (filters?.lowStockOnly !== undefined) params = params.set('lowStockOnly', filters.lowStockOnly);
     if (filters?.hasExpiryOnly !== undefined) params = params.set('hasExpiryOnly', filters.hasExpiryOnly);
+    if (filters?.searchTerm) params = params.set('searchTerm', filters.searchTerm);
+    if (filters?.pageNumber !== undefined) params = params.set('pageNumber', filters.pageNumber);
+    if (filters?.pageSize !== undefined) params = params.set('pageSize', filters.pageSize);
     return this.http.get<StockItemDto[]>(`${this.base}/StockItems`, { params });
   }
 
@@ -134,6 +140,9 @@ export class StockService {
     fromDate?: string;
     toDate?: string;
     includeLines?: boolean;
+    searchTerm?: string;
+    pageNumber?: number;
+    pageSize?: number;
   }): Observable<StockMovementDto[]> {
     let params = new HttpParams();
     if (filters?.type) params = params.set('type', filters.type);
@@ -143,6 +152,9 @@ export class StockService {
     if (filters?.fromDate) params = params.set('fromDate', filters.fromDate);
     if (filters?.toDate) params = params.set('toDate', filters.toDate);
     if (filters?.includeLines !== undefined) params = params.set('includeLines', filters.includeLines);
+    if (filters?.searchTerm) params = params.set('searchTerm', filters.searchTerm);
+    if (filters?.pageNumber !== undefined) params = params.set('pageNumber', filters.pageNumber);
+    if (filters?.pageSize !== undefined) params = params.set('pageSize', filters.pageSize);
     return this.http.get<StockMovementDto[]>(`${this.base}/StockMovements`, { params });
   }
 

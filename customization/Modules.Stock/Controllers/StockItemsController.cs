@@ -62,9 +62,12 @@ public class StockItemsController : ControllerBase
         [FromQuery] Guid? categoryId, 
         [FromQuery] bool? activeOnly, 
         [FromQuery] bool? lowStockOnly, 
-        [FromQuery] bool? hasExpiryOnly)
+        [FromQuery] bool? hasExpiryOnly,
+        [FromQuery] string? searchTerm,
+        [FromQuery] int? pageNumber,
+        [FromQuery] int? pageSize)
     {
-        var result = await _mediator.Send(new GetAllStockItemsQuery(categoryId, activeOnly, lowStockOnly, hasExpiryOnly));
+        var result = await _mediator.Send(new GetAllStockItemsQuery(categoryId, activeOnly, lowStockOnly, hasExpiryOnly, searchTerm, pageNumber, pageSize));
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }

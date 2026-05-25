@@ -6,6 +6,7 @@ using Modules.Users.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage;
 
@@ -119,50 +120,86 @@ using (var scope = app.Services.CreateScope())
     var usersDb = scope.ServiceProvider.GetRequiredService<UsersDbContext>();
     
     Console.WriteLine("Applying database initialization...");
-    var deleted = stockDb.Database.EnsureDeleted(); 
-    Console.WriteLine($"Database deleted: {deleted}");
+    var resetDb = app.Configuration.GetValue<bool>("ResetDatabaseOnStartup", false);
+    bool stockCreated = false;
     
-    var stockCreated = stockDb.Database.EnsureCreated();
-    Console.WriteLine($"Stock Database created: {stockCreated}");
-    
-    // Since both DbContexts share the same database, EnsureCreated on stockDb creates the database.
-    // We must use RelationalDatabaseCreator to create tables for usersDb since the database already exists.
-    var databaseCreator = usersDb.Database.GetService<IDatabaseCreator>() as IRelationalDatabaseCreator;
-    if (databaseCreator != null)
+    if (resetDb)
     {
-        databaseCreator.CreateTables();
-        Console.WriteLine("Users database tables created.");
+        var deleted = stockDb.Database.EnsureDeleted(); 
+        Console.WriteLine($"Database deleted: {deleted}");
+        stockCreated = stockDb.Database.EnsureCreated();
+        Console.WriteLine($"Stock Database created: {stockCreated}");
+    }
+    else
+    {
+        stockCreated = stockDb.Database.EnsureCreated();
+        Console.WriteLine($"Stock Database created: {stockCreated}");
     }
     
-    Console.WriteLine("Seeding Stock data...");
-    await DbSeeder.SeedAsync(stockDb);
+    // Since both DbContexts share the same database, EnsureCreated on stockDb creates the database.
+    // We must use RelationalDatabaseCreator to create tables for usersDb if the database was just created.
+    if (stockCreated)
+    {
+        var databaseCreator = usersDb.Database.GetService<IDatabaseCreator>() as IRelationalDatabaseCreator;
+        if (databaseCreator != null)
+        {
+            try
+            {
+                databaseCreator.CreateTables();
+                Console.WriteLine("Users database tables created.");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Note: Users tables might already exist: {ex.Message}");
+            }
+        }
+    }
     
-    Console.WriteLine("Seeding User data...");
-    var passwordHasher = scope.ServiceProvider.GetRequiredService<Modules.Users.Infrastructure.Security.IPasswordHasher>();
-    var adminUser = Modules.Users.Domain.Entities.User.Create(
-        "admin",
-        "admin@fth.dz",
-        passwordHasher.HashPassword("AdminPassword123!"),
-        "Fateh Admin",
-        Modules.Users.Domain.Enums.UserRole.Admin
-    );
-    var managerUser = Modules.Users.Domain.Entities.User.Create(
-        "manager",
-        "manager@fth.dz",
-        passwordHasher.HashPassword("ManagerPassword123!"),
-        "Fateh Manager",
-        Modules.Users.Domain.Enums.UserRole.Manager
-    );
-    var workerUser = Modules.Users.Domain.Entities.User.Create(
-        "worker",
-        "worker@fth.dz",
-        passwordHasher.HashPassword("WorkerPassword123!"),
-        "Fateh Worker",
-        Modules.Users.Domain.Enums.UserRole.Worker
-    );
+    // Seed stock data if database was just created or is completely empty
+    var shouldSeedStock = stockCreated || !await stockDb.StockItems.AnyAsync();
+    if (shouldSeedStock)
+    {
+        Console.WriteLine("Seeding Stock data...");
+        await DbSeeder.SeedAsync(stockDb);
+        
+        var seedLarge = app.Configuration.GetValue<bool>("SeedLargeData", false);
+        if (seedLarge)
+        {
+            await DbSeeder.SeedLargeDataAsync(stockDb);
+        }
+    }
+    
+    // Seed user data if users table is empty
+    var shouldSeedUsers = stockCreated || !await usersDb.Users.AnyAsync();
+    if (shouldSeedUsers)
+    {
+        Console.WriteLine("Seeding User data...");
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<Modules.Users.Infrastructure.Security.IPasswordHasher>();
+        var adminUser = Modules.Users.Domain.Entities.User.Create(
+            "admin",
+            "admin@fth.dz",
+            passwordHasher.HashPassword("AdminPassword123!"),
+            "Fateh Admin",
+            Modules.Users.Domain.Enums.UserRole.Admin
+        );
+        var managerUser = Modules.Users.Domain.Entities.User.Create(
+            "manager",
+            "manager@fth.dz",
+            passwordHasher.HashPassword("ManagerPassword123!"),
+            "Fateh Manager",
+            Modules.Users.Domain.Enums.UserRole.Manager
+        );
+        var workerUser = Modules.Users.Domain.Entities.User.Create(
+            "worker",
+            "worker@fth.dz",
+            passwordHasher.HashPassword("WorkerPassword123!"),
+            "Fateh Worker",
+            Modules.Users.Domain.Enums.UserRole.Worker
+        );
 
-    usersDb.Users.AddRange(adminUser, managerUser, workerUser);
-    await usersDb.SaveChangesAsync();
+        usersDb.Users.AddRange(adminUser, managerUser, workerUser);
+        await usersDb.SaveChangesAsync();
+    }
     
     Console.WriteLine("Initialization complete.");
 }

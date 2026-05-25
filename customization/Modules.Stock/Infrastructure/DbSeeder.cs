@@ -111,4 +111,111 @@ public static class DbSeeder
             await context.SaveChangesAsync();
         }
     }
+
+    public static async Task SeedLargeDataAsync(StockDbContext context)
+    {
+        Console.WriteLine("Starting large seeding of 100,000 articles and movements...");
+        
+        // Disable Change Tracking auto-detection to optimize performance
+        context.ChangeTracker.AutoDetectChangesEnabled = false;
+
+        // Fetch needed reference records
+        var categories = await context.Categories.ToListAsync();
+        var warehouses = await context.Warehouses.ToListAsync();
+        var suppliers = await context.Suppliers.ToListAsync();
+        var departments = await context.Departments.ToListAsync();
+
+        if (!categories.Any() || !warehouses.Any() || !suppliers.Any())
+        {
+            Console.WriteLine("Basic reference data must be seeded before running large scale seeding.");
+            return;
+        }
+
+        var catId = categories[0].Id;
+        var whId = warehouses[0].Id;
+        var supId = suppliers[0].Id;
+
+        var rand = new Random(42);
+        var units = Enum.GetValues<UnitOfMeasure>();
+
+        int totalRecords = 100000;
+        int batchSize = 5000;
+
+        for (int i = 0; i < totalRecords; i += batchSize)
+        {
+            int currentBatchSize = Math.Min(batchSize, totalRecords - i);
+            
+            var stockItems = new System.Collections.Generic.List<StockItem>();
+            var stockLots = new System.Collections.Generic.List<StockLot>();
+            var movements = new System.Collections.Generic.List<StockMovement>();
+
+            for (int j = 0; j < currentBatchSize; j++)
+            {
+                int index = i + j;
+                var reference = $"ART-{index:D6}";
+                var name = $"Article Material #{index}";
+                var unit = units[index % units.Length];
+                
+                var item = StockItem.Create(
+                    reference,
+                    name,
+                    $"Bulk seeded test article number {index}",
+                    catId,
+                    unit,
+                    false, // hasExpiryDate
+                    false, // requiresSerialNumber
+                    5,     // defaultLowStockThreshold
+                    supId
+                );
+                stockItems.Add(item);
+
+                var lot = StockLot.Create(
+                    item.Id,
+                    whId,
+                    LotNumber.Create($"LOT-{index:D6}"),
+                    Quantity.Create(rand.Next(10, 1000), unit),
+                    MoneyAmount.Create(rand.Next(100, 10000), "DZD"),
+                    null,
+                    5,
+                    null
+                );
+                stockLots.Add(lot);
+
+                // Create a confirmed reception movement
+                var movement = StockMovement.CreateReception(
+                    $"MOV-SEED-{index:D6}",
+                    whId,
+                    supId,
+                    DateTime.UtcNow.AddDays(-rand.Next(1, 365)),
+                    "system",
+                    $"REF-SEED-{index}",
+                    "Bulk seeded test movement"
+                );
+                
+                movement.AddLine(
+                    item.Id,
+                    lot.Id,
+                    Quantity.Create(rand.Next(1, 10), unit),
+                    MoneyAmount.Create(rand.Next(100, 5000), "DZD"),
+                    "Seeded line"
+                );
+                
+                // Confirm the movement so that its status in database becomes Confirmed
+                movement.Confirm();
+                movements.Add(movement);
+            }
+
+            // Save elements in batches
+            context.StockItems.AddRange(stockItems);
+            context.StockLots.AddRange(stockLots);
+            context.StockMovements.AddRange(movements);
+
+            await context.SaveChangesAsync();
+            context.ChangeTracker.Clear(); // Critical to prevent memory leak / performance degradation
+
+            Console.WriteLine($"Seeded {i + currentBatchSize} / {totalRecords} articles and movements...");
+        }
+
+        Console.WriteLine("Large seeding complete!");
+    }
 }

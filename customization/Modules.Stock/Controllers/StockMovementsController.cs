@@ -45,9 +45,12 @@ public class StockMovementsController : ControllerBase
         [FromQuery] Guid? supplierId,
         [FromQuery] DateTime? fromDate,
         [FromQuery] DateTime? toDate,
-        [FromQuery] bool includeLines = false)
+        [FromQuery] bool includeLines = false,
+        [FromQuery] string? searchTerm = null,
+        [FromQuery] int? pageNumber = null,
+        [FromQuery] int? pageSize = null)
     {
-        var result = await _mediator.Send(new GetAllMovementsQuery(type, status, warehouseId, supplierId, fromDate, toDate, includeLines));
+        var result = await _mediator.Send(new GetAllMovementsQuery(type, status, warehouseId, supplierId, fromDate, toDate, includeLines, searchTerm, pageNumber, pageSize));
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }

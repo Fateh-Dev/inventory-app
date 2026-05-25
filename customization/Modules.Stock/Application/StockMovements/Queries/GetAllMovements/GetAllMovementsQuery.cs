@@ -14,5 +14,8 @@ public record GetAllMovementsQuery(
     Guid? SupplierId = null,
     DateTime? FromDate = null,
     DateTime? ToDate = null,
-    bool IncludeLines = false
+    bool IncludeLines = false,
+    string? SearchTerm = null,
+    int? PageNumber = null,
+    int? PageSize = null
 ) : IRequest<Result<IEnumerable<StockMovementDto>>>;
