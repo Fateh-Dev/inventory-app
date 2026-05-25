@@ -103,7 +103,7 @@ import { WarehouseDto } from '../../models/stock.models';
 
       <!-- Modal -->
       @if (showModal()) {
-        <div class="modal-overlay" (click)="closeModal()">
+        <div class="modal-overlay">
           <div class="modal-panel" style="max-width:580px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">{{ editItem() ? "Modifier l'entrepôt" : "Nouvel entrepôt" }}</h2>

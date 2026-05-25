@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal, HostListener } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StockService } from '../../../../services/stock.service';
@@ -13,7 +13,7 @@ const STATUS_FR: Record<string, string> = {
   Pending: 'En attente', Confirmed: 'Confirmé', Cancelled: 'Annulé'
 };
 
-@Component({
+@Component({ 
   selector: 'app-movements',
   standalone: true,
   imports: [CommonModule, FormsModule],
@@ -124,7 +124,7 @@ const STATUS_FR: Record<string, string> = {
 
       <!-- Modal détail -->
       @if (selectedMovement()) {
-        <div class="modal-overlay" (click)="selectedMovement.set(null)">
+        <div class="modal-overlay">
           <div class="modal-panel" style="max-width:720px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <div>
@@ -212,7 +212,7 @@ const STATUS_FR: Record<string, string> = {
 
       <!-- Modal création de mouvement -->
       @if (showCreateModal()) {
-        <div class="modal-overlay" (click)="showCreateModal.set(false)">
+        <div class="modal-overlay">
           <div class="modal-panel" style="max-width:620px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">Nouveau mouvement de stock</h2>
@@ -327,14 +327,36 @@ const STATUS_FR: Record<string, string> = {
 
               <div style="background:var(--bg-base);padding:12px;border-radius:8px;border:1px solid var(--border);">
                 <div class="form-grid" style="margin-bottom:8px;">
-                  <div class="form-group">
+                  <div class="form-group autocomplete-container" style="position:relative;">
                     <label class="form-label">Article *</label>
-                    <select class="form-select" [(ngModel)]="newLine.stockItemId" (change)="onItemSelect()">
-                      <option value="">Sélectionner...</option>
-                      @for (item of stockItems(); track item.id) {
-                        <option [value]="item.id">{{ item.name }} ({{ item.reference }})</option>
-                      }
-                    </select>
+                    <input class="form-input" 
+                           [(ngModel)]="itemSearchQuery" 
+                           (ngModelChange)="searchArticles($event)" 
+                           placeholder="Rechercher par nom ou référence…" 
+                           (focus)="showSuggestions.set(true)">
+                    
+                    @if (showSuggestions() && suggestions().length > 0) {
+                      <div class="suggestions-list" style="position:absolute; top:100%; left:0; right:0; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; max-height:220px; overflow-y:auto; z-index:1000; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); margin-top:4px;">
+                        @for (item of suggestions(); track item.id) {
+                          <div class="suggestion-item" 
+                               style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition:background 0.2s;"
+                               (click)="selectArticle(item)">
+                            <div style="font-weight:600; font-size:13px; color:var(--text-primary);">{{ item.name }}</div>
+                            <div style="font-size:11px; color:var(--accent); font-family:monospace; margin-top:2px;">{{ item.reference }}</div>
+                          </div>
+                        }
+                      </div>
+                    }
+                    @if (showSuggestions() && suggestions().length === 0 && itemSearchQuery.trim().length >= 2 && !loadingSuggestions()) {
+                      <div style="position:absolute; top:100%; left:0; right:0; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; padding:12px; font-size:13px; color:var(--text-muted); z-index:1000; text-align:center; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); margin-top:4px;">
+                        Aucun article trouvé
+                      </div>
+                    }
+                    @if (loadingSuggestions()) {
+                      <div style="position:absolute; top:100%; left:0; right:0; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; padding:12px; z-index:1000; display:flex; justify-content:center; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); margin-top:4px;">
+                        <div class="spinner" style="width:18px; height:18px; border-width:2px;"></div>
+                      </div>
+                    }
                   </div>
                   @if (createForm.type !== 'Reception') {
                     <div class="form-group">
@@ -427,6 +449,14 @@ export class MovementsComponent implements OnInit {
 
   newLine: any = { stockItemId: '', stockLotId: '', quantity: 1, unit: 'Piece', unitCost: 0, currency: 'DZD', notes: '' };
 
+  // Autocomplete search states
+  suggestions = signal<StockItemDto[]>([]);
+  loadingSuggestions = signal(false);
+  showSuggestions = signal(false);
+  itemSearchQuery = '';
+  selectedArticle = signal<StockItemDto | null>(null);
+  itemNamesMap = new Map<string, string>();
+
   search = '';
   filterType = '';
   filterStatus = '';
@@ -469,7 +499,7 @@ export class MovementsComponent implements OnInit {
     this.stockService.getSuppliers(true).subscribe(data => this.suppliers.set(data));
     this.stockService.getWarehouses(true).subscribe(data => this.warehouses.set(data));
     this.stockService.getDepartments(true).subscribe(data => this.departments.set(data));
-    this.stockService.getStockItems({ activeOnly: true, pageSize: 100000 }).subscribe(data => this.stockItems.set(data));
+    // No longer load all 100k items on startup to make loading instantaneous!
   }
 
   applyFilter() {
@@ -513,20 +543,56 @@ export class MovementsComponent implements OnInit {
   resetNewLine() {
     this.newLine = { stockItemId: '', stockLotId: '', quantity: 1, unit: 'Piece', unitCost: 0, currency: 'DZD', notes: '', expiryDate: '', serialNumber: '' };
     this.availableLots.set([]);
+    this.itemSearchQuery = '';
+    this.selectedArticle.set(null);
   }
 
   onItemSelect() {
-    if (!this.newLine.stockItemId) {
-      this.availableLots.set([]);
+    // Managed in autocomplete selection
+  }
+
+  // Autocomplete support methods
+  searchArticles(queryStr: string) {
+    if (!queryStr || queryStr.trim().length < 2) {
+      this.suggestions.set([]);
       return;
     }
-    const item = this.stockItems().find(i => i.id === this.newLine.stockItemId);
-    if (item) this.newLine.unit = item.defaultUnit;
+    this.loadingSuggestions.set(true);
+    this.stockService.getStockItems({
+      activeOnly: true,
+      searchTerm: queryStr,
+      pageSize: 15
+    }).subscribe({
+      next: (data) => {
+        this.suggestions.set(data);
+        this.loadingSuggestions.set(false);
+      },
+      error: () => {
+        this.loadingSuggestions.set(false);
+      }
+    });
+  }
+
+  selectArticle(item: StockItemDto) {
+    this.selectedArticle.set(item);
+    this.newLine.stockItemId = item.id;
+    this.newLine.unit = item.defaultUnit;
+    this.itemSearchQuery = `${item.name} (${item.reference})`;
+    this.showSuggestions.set(false);
+    this.itemNamesMap.set(item.id, item.name);
 
     if (this.createForm.type !== 'Reception') {
-      this.stockService.getStockItemLots(this.newLine.stockItemId, true).subscribe(lots => {
+      this.stockService.getStockItemLots(item.id, true).subscribe(lots => {
         this.availableLots.set(lots);
       });
+    }
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.autocomplete-container')) {
+      this.showSuggestions.set(false);
     }
   }
 
@@ -548,7 +614,7 @@ export class MovementsComponent implements OnInit {
   }
 
   getSelectedItem() {
-    return this.stockItems().find(i => i.id === this.newLine.stockItemId);
+    return this.selectedArticle();
   }
 
   addLine() {
@@ -564,7 +630,7 @@ export class MovementsComponent implements OnInit {
   }
 
   getItemName(id: string): string {
-    return this.stockItems().find(i => i.id === id)?.name ?? 'Inconnu';
+    return this.itemNamesMap.get(id) ?? this.stockItems().find(i => i.id === id)?.name ?? 'Inconnu';
   }
 
   viewDetail(m: StockMovementDto) {

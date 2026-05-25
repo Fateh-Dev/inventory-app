@@ -157,7 +157,7 @@ import { BrandDto, BrandModelDto, CategoryDto, DepartmentDto } from '../../model
 
       <!-- Category Modal -->
       @if (showCategoryModal()) {
-        <div class="modal-overlay" (click)="showCategoryModal.set(false)">
+        <div class="modal-overlay">
           <div class="modal-panel" style="max-width:400px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">{{ editCategory() ? 'Modifier la catégorie' : 'Nouvelle catégorie' }}</h2>
@@ -183,7 +183,7 @@ import { BrandDto, BrandModelDto, CategoryDto, DepartmentDto } from '../../model
 
       <!-- Brand Modal -->
       @if (showBrandModal()) {
-        <div class="modal-overlay" (click)="showBrandModal.set(false)">
+        <div class="modal-overlay">
           <div class="modal-panel" style="max-width:400px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">{{ editBrand() ? 'Modifier la marque' : 'Nouvelle marque' }}</h2>
@@ -205,7 +205,7 @@ import { BrandDto, BrandModelDto, CategoryDto, DepartmentDto } from '../../model
 
       <!-- Model Modal -->
       @if (showModelModal()) {
-        <div class="modal-overlay" (click)="showModelModal.set(false)">
+        <div class="modal-overlay">
           <div class="modal-panel" style="max-width:400px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">{{ editModel() ? 'Modifier le modèle' : 'Nouveau modèle' }}</h2>
@@ -227,7 +227,7 @@ import { BrandDto, BrandModelDto, CategoryDto, DepartmentDto } from '../../model
 
       <!-- Department Modal -->
       @if (showDepartmentModal()) {
-        <div class="modal-overlay" (click)="showDepartmentModal.set(false)">
+        <div class="modal-overlay">
           <div class="modal-panel" style="max-width:400px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">{{ editDepartment() ? 'Modifier le département' : 'Nouveau département' }}</h2>

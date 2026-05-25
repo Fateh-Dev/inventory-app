@@ -112,7 +112,7 @@ import { SupplierDto } from '../../models/stock.models';
 
       <!-- Modal -->
       @if (showModal()) {
-        <div class="modal-overlay" (click)="closeModal()">
+        <div class="modal-overlay">
           <div class="modal-panel" style="max-width:600px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">{{ editItem() ? 'Modifier le fournisseur' : 'Nouveau fournisseur' }}</h2>

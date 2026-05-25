@@ -110,7 +110,7 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
 
       <!-- Modal -->
       @if (showModal()) {
-        <div class="modal-overlay" (click)="closeModal()">
+        <div class="modal-overlay">
           <div class="modal-panel" style="max-width:550px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">{{ editItem() ? "Modifier l'utilisateur" : "Nouvel utilisateur" }}</h2>

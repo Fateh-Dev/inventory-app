@@ -55,10 +55,10 @@ public class GetAllStockItemsQueryHandler : IRequestHandler<GetAllStockItemsQuer
 
         query = query.OrderBy(i => i.Reference);
 
-        if (request.PageNumber.HasValue && request.PageSize.HasValue)
+        if (request.PageNumber.HasValue || request.PageSize.HasValue)
         {
-            int pageNumber = request.PageNumber.Value;
-            int pageSize = request.PageSize.Value;
+            int pageNumber = request.PageNumber ?? 1;
+            int pageSize = request.PageSize ?? 25;
             if (pageNumber < 1) pageNumber = 1;
             if (pageSize < 1) pageSize = 10;
             query = query.Skip((pageNumber - 1) * pageSize).Take(pageSize);

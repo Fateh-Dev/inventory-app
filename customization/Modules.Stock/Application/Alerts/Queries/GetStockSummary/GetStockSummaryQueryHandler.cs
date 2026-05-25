@@ -24,28 +24,48 @@ public class GetStockSummaryQueryHandler : IRequestHandler<GetStockSummaryQuery,
         var today = DateTime.UtcNow.Date;
         var expiringLimit = DateTime.UtcNow.AddDays(30);
 
-        // Fetch counts and aggregations using projection to avoid loading all entity models into EF change tracker/memory
-        var stockItemsSummary = await _context.StockItems
-            .Select(i => new
-            {
-                i.IsActive,
-                TotalQuantity = i.Lots.Where(l => !(l.ExpiryDate != null && l.ExpiryDate.Value.Date <= today)).Sum(l => l.CurrentQuantity.Value),
-                DefaultLowStockThreshold = i.DefaultLowStockThreshold,
-                ExpiringLotCount = i.Lots.Count(l => l.ExpiryDate != null && l.ExpiryDate.Value.Date <= expiringLimit && !(l.ExpiryDate != null && l.ExpiryDate.Value.Date <= today)),
-                ExpiredLotCount = i.Lots.Count(l => l.ExpiryDate != null && l.ExpiryDate.Value.Date <= today),
-                CategoryId = i.CategoryId
-            })
-            .ToListAsync(cancellationToken);
+        // 1. Total Items
+        var totalItems = await _context.StockItems.CountAsync(cancellationToken);
 
-        var totalItems = stockItemsSummary.Count;
-        var activeItems = stockItemsSummary.Count(s => s.IsActive);
-        var lowStockCount = stockItemsSummary.Count(s => s.TotalQuantity <= s.DefaultLowStockThreshold);
-        var expiringCount = stockItemsSummary.Sum(s => s.ExpiringLotCount);
-        var expiredCount = stockItemsSummary.Sum(s => s.ExpiredLotCount);
+        // 2. Active Items
+        var activeItems = await _context.StockItems.CountAsync(i => i.IsActive, cancellationToken);
+
+        // 3. Low Stock Count
+        var lowStockCount = await _context.StockItems.CountAsync(i => 
+            i.Lots.Where(l => !(l.ExpiryDate != null && l.ExpiryDate.Value.Date <= today))
+                  .Sum(l => l.CurrentQuantity.Value) <= i.DefaultLowStockThreshold, cancellationToken);
+
+        // 4. Expiring soon Count
+        var expiringCount = await _context.StockLots.CountAsync(l => 
+            l.ExpiryDate != null && l.ExpiryDate.Value.Date <= expiringLimit && !(l.ExpiryDate.Value.Date <= today), cancellationToken);
+
+        // 5. Expired Count
+        var expiredCount = await _context.StockLots.CountAsync(l => 
+            l.ExpiryDate != null && l.ExpiryDate.Value.Date <= today, cancellationToken);
 
         var totalWarehouses = await _context.Warehouses.CountAsync(cancellationToken);
         var unreadAlerts = await _context.StockAlerts.CountAsync(a => !a.IsRead, cancellationToken);
         var categories = await _context.Categories.AsNoTracking().ToDictionaryAsync(c => c.Id, c => c.Name, cancellationToken);
+
+        // 6. Category Breakdown
+        var categoryData = await _context.StockItems
+            .GroupBy(i => i.CategoryId)
+            .Select(g => new
+            {
+                CategoryId = g.Key,
+                ItemCount = g.Count(),
+                TotalQuantity = g.SelectMany(i => i.Lots)
+                                 .Where(l => !(l.ExpiryDate != null && l.ExpiryDate.Value.Date <= today))
+                                 .Sum(l => l.CurrentQuantity.Value)
+            })
+            .ToListAsync(cancellationToken);
+
+        var categoryBreakdown = categoryData.Select(g => new CategoryStockDto
+        {
+            Category = categories.ContainsKey(g.CategoryId) ? categories[g.CategoryId] : "Inconnue",
+            ItemCount = g.ItemCount,
+            TotalQuantity = g.TotalQuantity
+        }).ToList();
 
         var summary = new StockSummaryDto
         {
@@ -56,15 +76,7 @@ public class GetStockSummaryQueryHandler : IRequestHandler<GetStockSummaryQuery,
             ExpiredCount = expiredCount,
             TotalWarehouses = totalWarehouses,
             UnreadAlerts = unreadAlerts,
-            CategoryBreakdown = stockItemsSummary
-                .GroupBy(s => s.CategoryId)
-                .Select(g => new CategoryStockDto
-                {
-                    Category = categories.ContainsKey(g.Key) ? categories[g.Key] : "Inconnue",
-                    ItemCount = g.Count(),
-                    TotalQuantity = g.Sum(s => s.TotalQuantity)
-                })
-                .ToList()
+            CategoryBreakdown = categoryBreakdown
         };
 
         return Result<StockSummaryDto>.Success(summary);

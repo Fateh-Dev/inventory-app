@@ -139,7 +139,7 @@ const UNIT_FR: Record<string, string> = {
 
       <!-- Modal Création / Modification -->
       @if (showModal()) {
-        <div class="modal-overlay" (click)="closeModal()">
+        <div class="modal-overlay">
           <div class="modal-panel" style="max-width:640px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">{{ editItem() ? "Modifier l'article" : "Nouvel article en stock" }}</h2>
@@ -252,7 +252,7 @@ const UNIT_FR: Record<string, string> = {
 
       <!-- Quick Add Modals -->
       @if (quickAddType()) {
-        <div class="modal-overlay" style="z-index: 2000;" (click)="closeQuickAdd()">
+        <div class="modal-overlay" style="z-index: 2000;">
           <div class="modal-panel" style="max-width: 400px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h3 class="modal-title">Ajouter {{ quickAddLabel() }}</h3>
