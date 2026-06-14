@@ -104,7 +104,11 @@ const UNIT_FR: Record<string, string> = {
                   <td style="font-size:12.5px;">{{ m.destinationWarehouseName ?? m.departmentName ?? '—' }}</td>
                   <td style="text-align:center;color:var(--text-muted);">{{ m.lines.length }}</td>
                   <td style="text-align:right;font-weight:700;color:var(--success);">
-                    {{ m.totalValue | number:'1.2-2' }} DZD
+                    @if (m.type === 'Reception') {
+                      {{ m.totalValue | number:'1.2-2' }} DZD
+                    } @else {
+                      —
+                    }
                   </td>
                   <td style="text-align:right; white-space:nowrap;">
                     @if (m.status === 'Pending') {
@@ -174,10 +178,12 @@ const UNIT_FR: Record<string, string> = {
                     <div style="font-size:13px;font-weight:600;">{{ selectedMovement()!.supplierName }}</div>
                   </div>
                 }
-                <div style="background:var(--bg-base);padding:12px;border-radius:8px;border:1px solid var(--border);">
-                  <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">VALEUR TOTALE</div>
-                  <div style="font-size:16px;font-weight:800;color:var(--success);">{{ selectedMovement()!.totalValue | number:'1.2-2' }} DZD</div>
-                </div>
+                @if (selectedMovement()!.type === 'Reception') {
+                  <div style="background:var(--bg-base);padding:12px;border-radius:8px;border:1px solid var(--border);">
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">VALEUR TOTALE</div>
+                    <div style="font-size:16px;font-weight:800;color:var(--success);">{{ selectedMovement()!.totalValue | number:'1.2-2' }} DZD</div>
+                  </div>
+                }
               </div>
 
               <!-- Tableau des lignes -->
@@ -188,8 +194,10 @@ const UNIT_FR: Record<string, string> = {
                       <th>Article</th>
                       <th>Lot</th>
                       <th>Quantité</th>
-                      <th>Coût unitaire</th>
-                      <th style="text-align:right">Total ligne</th>
+                      @if (selectedMovement()!.type === 'Reception') {
+                        <th>Coût unitaire</th>
+                        <th style="text-align:right">Total ligne</th>
+                      }
                     </tr>
                   </thead>
                   <tbody>
@@ -201,8 +209,10 @@ const UNIT_FR: Record<string, string> = {
                         </td>
                         <td style="font-family:monospace;font-size:12px;color:var(--text-muted);">{{ line.lotNumber }}</td>
                         <td style="font-weight:700;">{{ line.quantity }} {{ line.unit }}</td>
-                        <td style="color:var(--text-muted);">{{ line.unitCost }} {{ line.currency }}</td>
-                        <td style="text-align:right;font-weight:700;color:var(--success);">{{ line.lineTotal | number:'1.2-2' }}</td>
+                        @if (selectedMovement()!.type === 'Reception') {
+                          <td style="color:var(--text-muted);">{{ line.unitCost }} {{ line.currency }}</td>
+                          <td style="text-align:right;font-weight:700;color:var(--success);">{{ line.lineTotal | number:'1.2-2' }}</td>
+                        }
                       </tr>
                     }
                   </tbody>

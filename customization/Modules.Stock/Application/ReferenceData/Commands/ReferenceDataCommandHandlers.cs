@@ -17,8 +17,12 @@ public class ReferenceDataCommandHandlers :
     IRequestHandler<UpdateModelCommand, Result<BrandModelDto>>,
     IRequestHandler<CreateCategoryCommand, Result<CategoryDto>>,
     IRequestHandler<UpdateCategoryCommand, Result<CategoryDto>>,
+    IRequestHandler<DeleteCategoryCommand, Result<bool>>,
     IRequestHandler<CreateDepartmentCommand, Result<DepartmentDto>>,
-    IRequestHandler<UpdateDepartmentCommand, Result<DepartmentDto>>
+    IRequestHandler<UpdateDepartmentCommand, Result<DepartmentDto>>,
+    IRequestHandler<DeleteDepartmentCommand, Result<bool>>,
+    IRequestHandler<DeleteBrandCommand, Result<bool>>,
+    IRequestHandler<DeleteModelCommand, Result<bool>>
 {
     private readonly StockDbContext _context;
     public ReferenceDataCommandHandlers(StockDbContext context) => _context = context;
@@ -89,5 +93,69 @@ public class ReferenceDataCommandHandlers :
         department.Update(request.Name, request.Code);
         await _context.SaveChangesAsync(ct);
         return Result<DepartmentDto>.Success(new DepartmentDto(department.Id, department.Name, department.Code, department.IsActive));
+    }
+
+    public async Task<Result<bool>> Handle(DeleteBrandCommand request, CancellationToken ct)
+    {
+        var brand = await _context.Brands.FindAsync(new object[] { request.Id }, ct);
+        if (brand == null) return Result<bool>.Failure(Error.NotFound("Brand.NotFound", "Brand not found"));
+        try
+        {
+            _context.Brands.Remove(brand);
+            await _context.SaveChangesAsync(ct);
+            return Result<bool>.Success(true);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<bool>.Failure(Error.Validation("Brand.InUse", "Cannot delete brand because it is currently in use."));
+        }
+    }
+
+    public async Task<Result<bool>> Handle(DeleteModelCommand request, CancellationToken ct)
+    {
+        var model = await _context.BrandModels.FindAsync(new object[] { request.Id }, ct);
+        if (model == null) return Result<bool>.Failure(Error.NotFound("Model.NotFound", "Model not found"));
+        try
+        {
+            _context.BrandModels.Remove(model);
+            await _context.SaveChangesAsync(ct);
+            return Result<bool>.Success(true);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<bool>.Failure(Error.Validation("Model.InUse", "Cannot delete model because it is currently in use."));
+        }
+    }
+
+    public async Task<Result<bool>> Handle(DeleteCategoryCommand request, CancellationToken ct)
+    {
+        var category = await _context.Categories.FindAsync(new object[] { request.Id }, ct);
+        if (category == null) return Result<bool>.Failure(Error.NotFound("Category.NotFound", "Category not found"));
+        try
+        {
+            _context.Categories.Remove(category);
+            await _context.SaveChangesAsync(ct);
+            return Result<bool>.Success(true);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<bool>.Failure(Error.Validation("Category.InUse", "Cannot delete category because it is currently in use."));
+        }
+    }
+
+    public async Task<Result<bool>> Handle(DeleteDepartmentCommand request, CancellationToken ct)
+    {
+        var department = await _context.Departments.FindAsync(new object[] { request.Id }, ct);
+        if (department == null) return Result<bool>.Failure(Error.NotFound("Department.NotFound", "Department not found"));
+        try
+        {
+            _context.Departments.Remove(department);
+            await _context.SaveChangesAsync(ct);
+            return Result<bool>.Success(true);
+        }
+        catch (DbUpdateException)
+        {
+            return Result<bool>.Failure(Error.Validation("Department.InUse", "Cannot delete department because it is currently in use."));
+        }
     }
 }

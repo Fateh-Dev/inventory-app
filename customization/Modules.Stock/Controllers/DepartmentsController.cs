@@ -34,4 +34,11 @@ public class DepartmentsController : ControllerBase
         var result = await _mediator.Send(command);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
     }
+
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> Delete(Guid id)
+    {
+        var result = await _mediator.Send(new DeleteDepartmentCommand(id));
+        return result.IsSuccess ? NoContent() : BadRequest(result.Error);
+    }
 }

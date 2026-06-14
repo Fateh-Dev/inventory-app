@@ -228,6 +228,14 @@ export class StockService {
     return this.http.put<BrandModelDto>(`${this.base}/Brands/models/${id}`, { id, name });
   }
 
+  deleteBrand(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/Brands/${id}`);
+  }
+
+  deleteModel(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/Brands/models/${id}`);
+  }
+
   getCategories(activeOnly?: boolean): Observable<CategoryDto[]> {
     let params = new HttpParams();
     if (activeOnly !== undefined) params = params.set('activeOnly', activeOnly);
@@ -240,6 +248,10 @@ export class StockService {
 
   updateCategory(id: string, name: string, code?: string): Observable<CategoryDto> {
     return this.http.put<CategoryDto>(`${this.base}/Categories/${id}`, { id, name, code });
+  }
+
+  deleteCategory(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/Categories/${id}`);
   }
 
   // ── Departments ────────────────────────────
@@ -255,5 +267,9 @@ export class StockService {
 
   updateDepartment(id: string, name: string, code: string): Observable<any> {
     return this.http.put<any>(`${this.base}/Departments/${id}`, { id, name, code });
+  }
+
+  deleteDepartment(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/Departments/${id}`);
   }
 }

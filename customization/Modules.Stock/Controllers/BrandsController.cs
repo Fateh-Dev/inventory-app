@@ -38,6 +38,13 @@ public class BrandsController : ControllerBase
         return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
     }
 
+    [HttpDelete("{id}")]
+    public async Task<ActionResult> DeleteBrand(Guid id)
+    {
+        var result = await _mediator.Send(new DeleteBrandCommand(id));
+        return result.IsSuccess ? NoContent() : BadRequest(result.Error);
+    }
+
     [HttpGet("models")]
     public async Task<ActionResult<IEnumerable<BrandModelDto>>> GetModels([FromQuery] Guid? brandId)
     {
@@ -58,5 +65,12 @@ public class BrandsController : ControllerBase
         if (id != command.Id) return BadRequest();
         var result = await _mediator.Send(command);
         return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
+    }
+
+    [HttpDelete("models/{id}")]
+    public async Task<ActionResult> DeleteModel(Guid id)
+    {
+        var result = await _mediator.Send(new DeleteModelCommand(id));
+        return result.IsSuccess ? NoContent() : BadRequest(result.Error);
     }
 }

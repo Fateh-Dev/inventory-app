@@ -45,8 +45,11 @@ import { BrandDto, BrandModelDto, CategoryDto, DepartmentDto } from '../../model
                   <td><span style="font-weight:600">{{ c.name }}</span></td>
                   <td><code style="font-size:12px;color:var(--accent)">{{ c.code || '-' }}</code></td>
                   <td style="text-align:right">
-                    <button class="btn btn-secondary btn-sm" (click)="openEditCategory(c)">
+                    <button class="btn btn-secondary btn-sm" style="margin-right:4px;" (click)="openEditCategory(c)">
                       <i class="pi pi-pencil"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm" (click)="requestDeleteCategory(c)">
+                      <i class="pi pi-trash"></i>
                     </button>
                   </td>
                 </tr>
@@ -73,8 +76,11 @@ import { BrandDto, BrandModelDto, CategoryDto, DepartmentDto } from '../../model
                     <tr [class.active-row]="selectedBrand()?.id === b.id" (click)="selectBrand(b)" style="cursor:pointer">
                       <td><span style="font-weight:600">{{ b.name }}</span></td>
                       <td style="text-align:right">
-                        <button class="btn btn-secondary btn-xs" (click)="openEditBrand(b); $event.stopPropagation()">
+                        <button class="btn btn-secondary btn-xs" style="margin-right:4px;" (click)="openEditBrand(b); $event.stopPropagation()">
                           <i class="pi pi-pencil" style="font-size:10px"></i>
+                        </button>
+                        <button class="btn btn-danger btn-xs" (click)="requestDeleteBrand(b); $event.stopPropagation()">
+                          <i class="pi pi-trash" style="font-size:10px"></i>
                         </button>
                       </td>
                     </tr>
@@ -105,8 +111,11 @@ import { BrandDto, BrandModelDto, CategoryDto, DepartmentDto } from '../../model
                       <tr>
                         <td><span style="font-weight:600">{{ m.name }}</span></td>
                         <td style="text-align:right">
-                          <button class="btn btn-secondary btn-xs" (click)="openEditModel(m)">
+                          <button class="btn btn-secondary btn-xs" style="margin-right:4px;" (click)="openEditModel(m)">
                             <i class="pi pi-pencil" style="font-size:10px"></i>
+                          </button>
+                          <button class="btn btn-danger btn-xs" (click)="requestDeleteModel(m)">
+                            <i class="pi pi-trash" style="font-size:10px"></i>
                           </button>
                         </td>
                       </tr>
@@ -144,8 +153,11 @@ import { BrandDto, BrandModelDto, CategoryDto, DepartmentDto } from '../../model
                   <td><span style="font-weight:600">{{ d.name }}</span></td>
                   <td><code style="font-size:12px;color:var(--accent)">{{ d.code || '-' }}</code></td>
                   <td style="text-align:right">
-                    <button class="btn btn-secondary btn-sm" (click)="openEditDepartment(d)">
+                    <button class="btn btn-secondary btn-sm" style="margin-right:4px;" (click)="openEditDepartment(d)">
                       <i class="pi pi-pencil"></i>
+                    </button>
+                    <button class="btn btn-danger btn-sm" (click)="requestDeleteDepartment(d)">
+                      <i class="pi pi-trash"></i>
                     </button>
                   </td>
                 </tr>
@@ -250,6 +262,26 @@ import { BrandDto, BrandModelDto, CategoryDto, DepartmentDto } from '../../model
           </div>
         </div>
       }
+
+      <!-- Delete Confirmation Modal -->
+      @if (showDeleteModal()) {
+        <div class="modal-overlay">
+          <div class="modal-panel" style="max-width:400px;" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2 class="modal-title">Confirmation</h2>
+              <button class="modal-close" (click)="showDeleteModal.set(false)"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="modal-body">
+              <p style="margin-top: 0; margin-bottom: 12px;">{{ deleteModalMessage() }}</p>
+              <p style="margin: 0; color: var(--text-muted); font-size: 13px;">Cette action est irréversible.</p>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary btn-sm" (click)="showDeleteModal.set(false)">Annuler</button>
+              <button class="btn btn-danger btn-sm" (click)="executeDelete()">Supprimer</button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [`
@@ -284,6 +316,11 @@ export class ReferenceDataComponent implements OnInit {
   editDepartment = signal<DepartmentDto | null>(null);
   departmentForm = { name: '', code: '' };
 
+  // Delete Modal State
+  showDeleteModal = signal(false);
+  deleteModalMessage = signal('');
+  deleteAction = signal<(() => void) | null>(null);
+
   ngOnInit() {
     this.loadCategories();
     this.loadBrands();
@@ -311,6 +348,19 @@ export class ReferenceDataComponent implements OnInit {
     obs.subscribe(() => { this.loadCategories(); this.showCategoryModal.set(false); });
   }
 
+  requestDeleteCategory(c: CategoryDto) {
+    this.deleteModalMessage.set(`Êtes-vous sûr de vouloir supprimer la catégorie "${c.name}" ?`);
+    this.deleteAction.set(() => this.deleteCategory(c));
+    this.showDeleteModal.set(true);
+  }
+
+  deleteCategory(c: CategoryDto) {
+    this.stockService.deleteCategory(c.id).subscribe({
+      next: () => { this.loadCategories(); this.showDeleteModal.set(false); },
+      error: (err) => alert(err.error?.detail || err.error?.title || 'Impossible de supprimer cet élément (il est probablement utilisé).')
+    });
+  }
+
   // Brand Actions
   openAddBrand() { this.editBrand.set(null); this.brandForm = { name: '' }; this.showBrandModal.set(true); }
   openEditBrand(b: BrandDto) { this.editBrand.set(b); this.brandForm = { name: b.name }; this.showBrandModal.set(true); }
@@ -319,6 +369,23 @@ export class ReferenceDataComponent implements OnInit {
       ? this.stockService.updateBrand(this.editBrand()!.id, this.brandForm.name)
       : this.stockService.createBrand(this.brandForm.name);
     obs.subscribe(() => { this.loadBrands(); this.showBrandModal.set(false); });
+  }
+
+  requestDeleteBrand(b: BrandDto) {
+    this.deleteModalMessage.set(`Êtes-vous sûr de vouloir supprimer la marque "${b.name}" ?`);
+    this.deleteAction.set(() => this.deleteBrand(b));
+    this.showDeleteModal.set(true);
+  }
+
+  deleteBrand(b: BrandDto) {
+    this.stockService.deleteBrand(b.id).subscribe({
+      next: () => {
+        if (this.selectedBrand()?.id === b.id) this.selectedBrand.set(null);
+        this.loadBrands();
+        this.showDeleteModal.set(false);
+      },
+      error: (err) => alert(err.error?.detail || err.error?.title || 'Impossible de supprimer cet élément (il est probablement utilisé).')
+    });
   }
 
   // Model Actions
@@ -332,6 +399,19 @@ export class ReferenceDataComponent implements OnInit {
     obs.subscribe(() => { this.loadModels(this.selectedBrand()!.id); this.showModelModal.set(false); });
   }
 
+  requestDeleteModel(m: BrandModelDto) {
+    this.deleteModalMessage.set(`Êtes-vous sûr de vouloir supprimer le modèle "${m.name}" ?`);
+    this.deleteAction.set(() => this.deleteModel(m));
+    this.showDeleteModal.set(true);
+  }
+
+  deleteModel(m: BrandModelDto) {
+    this.stockService.deleteModel(m.id).subscribe({
+      next: () => { this.loadModels(this.selectedBrand()!.id); this.showDeleteModal.set(false); },
+      error: (err) => alert(err.error?.detail || err.error?.title || 'Impossible de supprimer cet élément (il est probablement utilisé).')
+    });
+  }
+
   // Department Actions
   openAddDepartment() { this.editDepartment.set(null); this.departmentForm = { name: '', code: '' }; this.showDepartmentModal.set(true); }
   openEditDepartment(d: DepartmentDto) { this.editDepartment.set(d); this.departmentForm = { name: d.name, code: d.code || '' }; this.showDepartmentModal.set(true); }
@@ -340,5 +420,23 @@ export class ReferenceDataComponent implements OnInit {
       ? this.stockService.updateDepartment(this.editDepartment()!.id, this.departmentForm.name, this.departmentForm.code)
       : this.stockService.createDepartment(this.departmentForm.name, this.departmentForm.code);
     obs.subscribe(() => { this.loadDepartments(); this.showDepartmentModal.set(false); });
+  }
+
+  requestDeleteDepartment(d: DepartmentDto) {
+    this.deleteModalMessage.set(`Êtes-vous sûr de vouloir supprimer le département "${d.name}" ?`);
+    this.deleteAction.set(() => this.deleteDepartment(d));
+    this.showDeleteModal.set(true);
+  }
+
+  deleteDepartment(d: DepartmentDto) {
+    this.stockService.deleteDepartment(d.id).subscribe({
+      next: () => { this.loadDepartments(); this.showDeleteModal.set(false); },
+      error: (err) => alert(err.error?.detail || err.error?.title || 'Impossible de supprimer cet élément (il est probablement utilisé).')
+    });
+  }
+
+  executeDelete() {
+    const action = this.deleteAction();
+    if (action) action();
   }
 }
