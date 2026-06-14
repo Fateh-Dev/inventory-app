@@ -3,6 +3,8 @@ import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StockService } from '../../../../services/stock.service';
 import { AuthService } from '../../../../services/auth.service';
+import { PrintService } from '../../../../services/print.service';
+import { ExportService } from '../../../../services/export.service';
 import { StockMovementDto, SupplierDto, WarehouseDto, DepartmentDto, StockItemDto, StockLotDto } from '../../models/stock.models';
 
 const TYPE_FR: Record<string, string> = {
@@ -28,12 +30,20 @@ const UNIT_FR: Record<string, string> = {
     <div>
       <div class="page-header">
         <div>
-          <h1 class="page-title">Mouvements de stock</h1>
+          <h1 class="page-title" style="display:flex;align-items:center;gap:8px;">
+            Mouvements de stock
+            <i class="pi pi-info-circle" style="font-size:16px;color:var(--text-muted);cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'" (click)="showInfoModal.set(true)" title="À propos de cette page"></i>
+          </h1>
           <p class="page-subtitle">Suivez toutes les réceptions, sorties, transferts et ajustements de matériaux</p>
         </div>
-        <button class="btn btn-primary" (click)="openCreate()">
-          <i class="pi pi-plus"></i> Nouveau mouvement
-        </button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" (click)="exportCsv()">
+            <i class="pi pi-download"></i> Exporter CSV
+          </button>
+          <button class="btn btn-primary" (click)="openCreate()">
+            <i class="pi pi-plus"></i> Nouveau mouvement
+          </button>
+        </div>
       </div>
 
       <!-- Filtres -->
@@ -119,6 +129,11 @@ const UNIT_FR: Record<string, string> = {
                         <i class="pi pi-pencil"></i>
                       </button>
                     }
+                    @if (m.status === 'Confirmed') {
+                      <button class="btn btn-secondary btn-sm" style="margin-right:4px;" (click)="printMovement(m)" title="Imprimer le bon">
+                        <i class="pi pi-print"></i>
+                      </button>
+                    }
                     <button class="btn btn-secondary btn-sm" (click)="viewDetail(m)" title="Voir le détail">
                       <i class="pi pi-eye"></i>
                     </button>
@@ -154,6 +169,11 @@ const UNIT_FR: Record<string, string> = {
               </div>
               <div style="display:flex;gap:8px;align-items:center;">
                 <span class="badge" [ngClass]="getStatusBadge(selectedMovement()!.status)">{{ statusFr(selectedMovement()!.status) }}</span>
+                @if (selectedMovement()!.status === 'Confirmed') {
+                  <button class="btn btn-secondary btn-sm" (click)="printMovement(selectedMovement()!)" title="Imprimer le bon">
+                    <i class="pi pi-print"></i> Imprimer
+                  </button>
+                }
                 <button class="modal-close" (click)="selectedMovement.set(null)"><i class="pi pi-times"></i></button>
               </div>
             </div>
@@ -473,10 +493,85 @@ const UNIT_FR: Record<string, string> = {
             </div>
             <div class="modal-footer">
               <button class="btn btn-secondary" (click)="showCreateModal.set(false)">Annuler</button>
-              <button class="btn btn-primary" (click)="saveMovement()" [disabled]="saving() || !createForm.lines?.length">
+              <button class="btn btn-primary" (click)="saveMovement()" [disabled]="saving()">
                 @if (saving()) { <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> }
                 {{ editingId() ? 'Enregistrer les modifications' : 'Créer le mouvement' }}
               </button>
+            </div>
+          </div>
+        </div>
+      }
+      
+      <!-- Info Modal -->
+      @if (showInfoModal()) {
+        <div class="modal-overlay" style="z-index: 2100;">
+          <div class="modal-panel" style="max-width:500px;" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2 class="modal-title" style="display:flex;align-items:center;gap:8px;">
+                <i class="pi pi-info-circle" style="color:var(--accent)"></i>
+                Mouvements de Stock
+              </h2>
+              <button class="modal-close" (click)="showInfoModal.set(false)"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="modal-body" style="font-size:14px;line-height:1.6;color:var(--text-primary);">
+              <p style="margin-bottom:16px;"><strong>Description :</strong><br>
+                Ce module gère le flux opérationnel des marchandises à travers les réceptions, distributions/sorties, transferts d'entrepôts, retours de matériel, ou ajustements.
+              </p>
+              <p style="margin-bottom:8px;"><strong>Fonctionnalités clés :</strong></p>
+              <ul style="padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:6px;">
+                <li>📥 <strong>Réception & Saisie financière</strong> : Saisissez les livraisons de fournisseurs avec coûts unitaires (valeur totale calculée automatiquement).</li>
+                <li>📤 <strong>Flux internes (Sorties/Transferts)</strong> : Effectuez des sorties vers des départements internes ou transférez vers d'autres dépôts (sans information de coût requise).</li>
+                <li>📝 <strong>Mode Brouillon (En attente)</strong> : Créez des mouvements temporaires que vous pouvez modifier librement sans impacter les stocks réels.</li>
+                <li>🔒 <strong>Validation (Confirmation)</strong> : Confirmez définitivement un mouvement pour appliquer les modifications physiques de stocks et générer les lots.</li>
+                <li>🖨️ <strong>Documents PDF/Impression</strong> : Imprimez des bons de livraison/sortie professionnels signés.</li>
+              </ul>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" (click)="showInfoModal.set(false)">Fermer</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Custom Alert Dialog -->
+      @if (customAlert()) {
+        <div class="modal-overlay" style="z-index: 2200;">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper" [style.background]="customAlert()?.severity === 'error' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(245, 158, 11, 0.1)'" [style.color]="customAlert()?.severity === 'error' ? '#ef4444' : '#f59e0b'">
+              <i class="pi" [ngClass]="customAlert()?.severity === 'error' ? 'pi-times-circle' : 'pi-exclamation-triangle'"></i>
+            </div>
+            <h2 class="modal-title">{{ customAlert()?.title }}</h2>
+            <div class="confirm-message" style="text-align: left; margin-top: 12px; color: var(--text-primary);">
+              <p style="margin-bottom: 8px;">{{ customAlert()?.message }}</p>
+              @if (customAlert()?.list && customAlert()!.list!.length > 0) {
+                <ul style="padding-left: 20px; list-style-type: disc; display: flex; flex-direction: column; gap: 4px; color: var(--text-secondary);">
+                  @for (item of customAlert()!.list; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              }
+            </div>
+            <div class="modal-footer" style="justify-content: center; margin-top: 24px;">
+              <button class="btn btn-primary" (click)="closeCustomAlert()">D'accord</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Custom Confirm Dialog -->
+      @if (customConfirm()) {
+        <div class="modal-overlay" style="z-index: 2200;">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper" style="background: rgba(14, 165, 233, 0.12); color: var(--accent);">
+              <i class="pi pi-question-circle"></i>
+            </div>
+            <h2 class="modal-title">{{ customConfirm()?.title }}</h2>
+            <p class="confirm-message" style="margin-top: 8px; color: var(--text-secondary);">
+              {{ customConfirm()?.message }}
+            </p>
+            <div class="modal-footer" style="justify-content: center; margin-top: 24px; gap: 12px;">
+              <button class="btn btn-secondary" (click)="closeCustomConfirm(false)">Annuler</button>
+              <button class="btn btn-primary" (click)="closeCustomConfirm(true)">Confirmer</button>
             </div>
           </div>
         </div>
@@ -487,9 +582,85 @@ const UNIT_FR: Record<string, string> = {
 export class MovementsComponent implements OnInit {
   private stockService = inject(StockService);
   private authService = inject(AuthService);
+  private printService = inject(PrintService);
+  private exportService = inject(ExportService);
   
   currentUser = this.authService.currentUser;
 
+  showInfoModal = signal(false);
+  customAlert = signal<{ title: string; message: string; severity?: 'error' | 'warning' | 'success'; list?: string[] } | null>(null);
+  customConfirm = signal<{ title: string; message: string; callback: () => void } | null>(null);
+
+  closeCustomAlert() {
+    this.customAlert.set(null);
+  }
+
+  showConfirm(title: string, message: string, callback: () => void) {
+    this.customConfirm.set({ title, message, callback });
+  }
+
+  closeCustomConfirm(confirmed: boolean) {
+    const confirmData = this.customConfirm();
+    this.customConfirm.set(null);
+    if (confirmed && confirmData?.callback) {
+      confirmData.callback();
+    }
+  }
+
+  validateForm(): boolean {
+    const missing: string[] = [];
+    if (!this.createForm.type) {
+      missing.push("Type de mouvement");
+    }
+    if (!this.createForm.movementDate) {
+      missing.push("Date du mouvement");
+    }
+
+    if (this.createForm.type === 'Reception') {
+      if (!this.createForm.destinationWarehouseId) {
+        missing.push("Entrepôt de destination");
+      }
+      if (!this.createForm.supplierId) {
+        missing.push("Fournisseur");
+      }
+    } else if (this.createForm.type === 'Issue' || this.createForm.type === 'Disposal') {
+      if (!this.createForm.sourceWarehouseId) {
+        missing.push("Entrepôt source");
+      }
+      if (!this.createForm.departmentId) {
+        missing.push("Département (Destination)");
+      }
+    } else if (this.createForm.type === 'Transfer') {
+      if (!this.createForm.sourceWarehouseId) {
+        missing.push("Entrepôt source");
+      }
+      if (!this.createForm.destinationWarehouseId) {
+        missing.push("Entrepôt de destination");
+      }
+      if (this.createForm.sourceWarehouseId && this.createForm.destinationWarehouseId && this.createForm.sourceWarehouseId === this.createForm.destinationWarehouseId) {
+        missing.push("L'entrepôt de destination doit être différent de l'entrepôt source");
+      }
+    } else {
+      if (!this.createForm.sourceWarehouseId) {
+        missing.push("Entrepôt");
+      }
+    }
+
+    if (!this.createForm.lines || this.createForm.lines.length === 0) {
+      missing.push("Au moins une ligne de mouvement");
+    }
+
+    if (missing.length > 0) {
+      this.customAlert.set({
+        title: "Formulaire incomplet",
+        message: "Veuillez remplir tous les champs obligatoires suivants :",
+        severity: "warning",
+        list: missing
+      });
+      return false;
+    }
+    return true;
+  }
   loading = signal(true);
   saving = signal(false);
   showCreateModal = signal(false);
@@ -620,7 +791,9 @@ export class MovementsComponent implements OnInit {
             unit: l.unit,
             unitCost: l.unitCost,
             currency: l.currency,
-            notes: l.notes || ''
+            notes: l.notes || '',
+            expiryDate: l.expiryDate ? new Date(l.expiryDate).toISOString().split('T')[0] : '',
+            serialNumber: l.serialNumber || ''
           }))
         };
         // Fetch item names for lines
@@ -636,13 +809,17 @@ export class MovementsComponent implements OnInit {
   }
 
   confirmMovement(m: StockMovementDto) {
-    if (confirm(`Voulez-vous vraiment confirmer le mouvement ${m.movementNumber} ? Cette action mettra à jour les stocks et est irréversible.`)) {
-      this.loading.set(true);
-      this.stockService.confirmMovement(m.id).subscribe({
-        next: () => this.load(),
-        error: () => this.loading.set(false)
-      });
-    }
+    this.showConfirm(
+      `Confirmer le mouvement ${m.movementNumber}`,
+      `Voulez-vous vraiment confirmer le mouvement ${m.movementNumber} ? Cette action mettra à jour les stocks et est irréversible.`,
+      () => {
+        this.loading.set(true);
+        this.stockService.confirmMovement(m.id).subscribe({
+          next: () => this.load(),
+          error: () => this.loading.set(false)
+        });
+      }
+    );
   }
 
   resetNewLine() {
@@ -746,7 +923,7 @@ export class MovementsComponent implements OnInit {
   }
 
   saveMovement() {
-    if (!this.createForm.type || !this.createForm.movementDate) return;
+    if (!this.validateForm()) return;
 
     this.saving.set(true);
     const payload = {
@@ -775,6 +952,24 @@ export class MovementsComponent implements OnInit {
         error: () => this.saving.set(false)
       });
     }
+  }
+
+  printMovement(m: StockMovementDto) {
+    this.printService.printMovement(m);
+  }
+
+  exportCsv() {
+    const data = this.items().map(m => ({
+      'N° Mouvement': m.movementNumber,
+      'Type': this.typeFr(m.type),
+      'Statut': this.statusFr(m.status),
+      'Date': new Date(m.movementDate).toLocaleDateString('fr-FR'),
+      'Provenance': m.sourceWarehouseName || m.supplierName || '—',
+      'Destination': m.destinationWarehouseName || m.departmentName || '—',
+      'Référence': m.reference || '—',
+      'Créé par': m.createdByUser || '—'
+    }));
+    this.exportService.exportToCsv(data, 'mouvements_stock');
   }
 
   typeFr(type: string): string { return TYPE_FR[type] ?? type; }

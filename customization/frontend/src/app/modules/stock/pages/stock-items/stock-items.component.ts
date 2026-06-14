@@ -1,9 +1,12 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { ActivatedRoute } from '@angular/router';
 import { Observable } from 'rxjs';
 import { StockService } from '../../../../services/stock.service';
-import { StockItemDto, SupplierDto, BrandDto, BrandModelDto, CategoryDto } from '../../models/stock.models';
+import { StockItemDto, SupplierDto, BrandDto, BrandModelDto, CategoryDto, StockLotDto } from '../../models/stock.models';
+import { PrintService } from '../../../../services/print.service';
+import { ExportService } from '../../../../services/export.service';
 
 const UNITS = ['Piece','Liter','Kilogram','Meter','SquareMeter','CubicMeter','Box','Pallet','Roll','Bag','Can','Set'];
 const UNIT_FR: Record<string, string> = {
@@ -11,7 +14,6 @@ const UNIT_FR: Record<string, string> = {
   SquareMeter: 'Mètre carré', CubicMeter: 'Mètre cube', Box: 'Carton',
   Pallet: 'Palette', Roll: 'Rouleau', Bag: 'Sac', Can: 'Bidon', Set: 'Ensemble'
 };
-
 @Component({
   selector: 'app-stock-items',
   standalone: true,
@@ -20,12 +22,20 @@ const UNIT_FR: Record<string, string> = {
     <div>
       <div class="page-header">
         <div>
-          <h1 class="page-title">Articles en stock</h1>
-          <p class="page-subtitle">Gérez votre catalogue de matériaux d'infrastructure</p>
+          <h1 class="page-title" style="display:flex;align-items:center;gap:8px;">
+            Articles en stock
+            <i class="pi pi-info-circle" style="font-size:16px;color:var(--text-muted);cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'" (click)="showInfoModal.set(true)" title="À propos de cette page"></i>
+          </h1>
+          <p class="page-subtitle">Gerez votre catalogue de materiaux d'infrastructure</p>
         </div>
-        <button class="btn btn-primary" (click)="openCreate()">
-          <i class="pi pi-plus"></i> Ajouter un article
-        </button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" (click)="exportCsv()">
+            <i class="pi pi-download"></i> Exporter CSV
+          </button>
+          <button class="btn btn-primary" (click)="openCreate()">
+            <i class="pi pi-plus"></i> Ajouter un article
+          </button>
+        </div>
       </div>
 
       <!-- Filtres -->
@@ -105,6 +115,9 @@ const UNIT_FR: Record<string, string> = {
                   </td>
                   <td style="text-align:right">
                     <div style="display:flex;gap:6px;justify-content:flex-end;">
+                      <button class="btn btn-secondary btn-sm" (click)="openHistory(item)" title="Fiche Article / Historique">
+                        <i class="pi pi-search"></i>
+                      </button>
                       <button class="btn btn-secondary btn-sm" (click)="openEdit(item)" title="Modifier">
                         <i class="pi pi-pencil"></i>
                       </button>
@@ -117,6 +130,9 @@ const UNIT_FR: Record<string, string> = {
                           <i class="pi pi-check"></i>
                         </button>
                       }
+                      <button class="btn btn-danger btn-sm" (click)="confirmDelete(item)" title="Supprimer">
+                        <i class="pi pi-trash"></i>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -293,12 +309,207 @@ const UNIT_FR: Record<string, string> = {
               Êtes-vous sûr de vouloir désactiver l'article <strong>{{ itemToDeactivate()?.name }}</strong> ?<br>
               Il ne sera plus disponible pour les nouvelles entrées ou sorties.
             </p>
-            <div class="modal-footer" style="justify-content:center;margin-top:24px;">
+            <div class="modal-footer" style="justify-content:center;margin-top:24px;gap:12px;">
               <button class="btn btn-secondary" (click)="cancelDeactivate()">Annuler</button>
               <button class="btn btn-danger" (click)="executeDeactivate()" [disabled]="saving()">
-                @if (saving()) { <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> }
+                @if (saving()) { <div class="spinner" style="width:14px;height:14px;border-width:2px;margin-right:6px;"></div> }
                 Oui, désactiver
               </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Modal Fiche Article & Historique -->
+      @if (showHistoryModal() && selectedItem()) {
+        <div class="modal-overlay" style="z-index: 1500;">
+          <div class="modal-panel" style="max-width:900px;" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div>
+                <h2 class="modal-title">Fiche Article: {{ selectedItem()?.name }}</h2>
+                <p style="font-size:12px;color:var(--text-muted);margin-top:2px;">Réf: <code style="font-size:12px;background:rgba(14,165,233,0.08);padding:2px 7px;border-radius:4px;color:var(--accent)">{{ selectedItem()?.reference }}</code></p>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-secondary btn-sm" (click)="printItemCard()"><i class="pi pi-print"></i> Imprimer</button>
+                <button class="btn btn-secondary btn-sm" (click)="exportHistoryCsv()"><i class="pi pi-download"></i> Exporter Historique</button>
+                <button class="modal-close" (click)="showHistoryModal.set(false)"><i class="pi pi-times"></i></button>
+              </div>
+            </div>
+            <div class="modal-body" style="max-height: 70vh; overflow-y: auto;">
+              <!-- Grid info + lots -->
+              <div class="form-grid" style="grid-template-columns: 1fr 1.5fr; gap: 20px;">
+                <!-- Infos techniques -->
+                <div class="card" style="margin-bottom:0; padding:16px;">
+                  <h3 style="margin-top:0;margin-bottom:12px;font-size:14px;border-bottom:1px solid var(--border);padding-bottom:6px;color:var(--accent);">Caractéristiques</h3>
+                  <table style="width:100%;font-size:13px;border-collapse:collapse;">
+                    <tr style="border-bottom:1px solid var(--border-light);"><td style="padding:6px 0;color:var(--text-muted);">Catégorie:</td><td style="padding:6px 0;font-weight:600;">{{ selectedItem()?.categoryName }}</td></tr>
+                    <tr style="border-bottom:1px solid var(--border-light);"><td style="padding:6px 0;color:var(--text-muted);">Marque:</td><td style="padding:6px 0;font-weight:600;">{{ selectedItem()?.brandName || '—' }}</td></tr>
+                    <tr style="border-bottom:1px solid var(--border-light);"><td style="padding:6px 0;color:var(--text-muted);">Modèle:</td><td style="padding:6px 0;font-weight:600;">{{ selectedItem()?.brandModelName || '—' }}</td></tr>
+                    <tr style="border-bottom:1px solid var(--border-light);"><td style="padding:6px 0;color:var(--text-muted);">Unité:</td><td style="padding:6px 0;font-weight:600;">{{ unitFr(selectedItem()!.defaultUnit) }}</td></tr>
+                    <tr style="border-bottom:1px solid var(--border-light);"><td style="padding:6px 0;color:var(--text-muted);">Stock Total:</td><td style="padding:6px 0;font-weight:700;" [style.color]="selectedItem()!.isLowStock ? 'var(--danger)' : 'var(--success)'">{{ selectedItem()?.totalQuantity }}</td></tr>
+                    <tr style="border-bottom:1px solid var(--border-light);"><td style="padding:6px 0;color:var(--text-muted);">Seuil critique:</td><td style="padding:6px 0;font-weight:600;">{{ selectedItem()?.defaultLowStockThreshold }}</td></tr>
+                    <tr><td style="padding:6px 0;color:var(--text-muted);">Statut:</td><td style="padding:6px 0;"><span class="badge" [ngClass]="selectedItem()!.isActive ? 'badge-success' : 'badge-muted'">{{ selectedItem()!.isActive ? 'Actif' : 'Inactif' }}</span></td></tr>
+                  </table>
+                </div>
+
+                <!-- Répartition par dépôt -->
+                <div class="card" style="margin-bottom:0; padding:16px;">
+                  <h3 style="margin-top:0;margin-bottom:12px;font-size:14px;border-bottom:1px solid var(--border);padding-bottom:6px;color:var(--accent);">Lots en Stock</h3>
+                  @if (selectedItemLots().length === 0) {
+                    <p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px;">Aucun lot actif en stock</p>
+                  } @else {
+                    <div style="max-height:165px;overflow-y:auto;">
+                      <table style="width:100%;font-size:12px;border-collapse:collapse;">
+                        <thead>
+                          <tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-muted);">
+                            <th style="padding:4px;">N° Lot</th>
+                            <th style="padding:4px;">Entrepôt</th>
+                            <th style="padding:4px;text-align:right;">Quantité</th>
+                            <th style="padding:4px;">Péremption</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          @for (lot of selectedItemLots(); track lot.id) {
+                            @if (lot.currentQuantity > 0) {
+                              <tr style="border-bottom:1px solid var(--border-light);">
+                                <td style="padding:5px 4px;"><code style="font-family:monospace;font-size:11px;">{{ lot.lotNumber }}</code></td>
+                                <td style="padding:5px 4px;">{{ lot.warehouseName }}</td>
+                                <td style="padding:5px 4px;text-align:right;font-weight:600;">{{ lot.currentQuantity }}</td>
+                                <td style="padding:5px 4px;">{{ lot.expiryDate ? (lot.expiryDate | date:'dd/MM/yyyy') : '—' }}</td>
+                              </tr>
+                            }
+                          }
+                        </tbody>
+                      </table>
+                    </div>
+                  }
+                </div>
+              </div>
+
+              <!-- Historique des mouvements -->
+              <div class="card" style="margin-top:20px; margin-bottom:0; padding:16px;">
+                <h3 style="margin-top:0;margin-bottom:12px;font-size:14px;border-bottom:1px solid var(--border);padding-bottom:6px;color:var(--accent);">Historique des Mouvements</h3>
+                @if (loadingHistory()) {
+                  <div style="text-align:center;padding:20px;"><div class="spinner"></div></div>
+                } @else if (selectedItemHistory().length === 0) {
+                  <p style="color:var(--text-muted);font-size:13px;text-align:center;padding:20px;">Aucun mouvement enregistré pour cet article</p>
+                } @else {
+                  <table style="width:100%;font-size:12px;border-collapse:collapse;">
+                    <thead>
+                      <tr style="border-bottom:2px solid var(--border);text-align:left;color:var(--text-muted);font-weight:bold;">
+                        <th style="padding:6px 4px;">Date</th>
+                        <th style="padding:6px 4px;">N° Mouvement</th>
+                        <th style="padding:6px 4px;">Type</th>
+                        <th style="padding:6px 4px;text-align:right;">Quantité</th>
+                        <th style="padding:6px 4px;">Provenance</th>
+                        <th style="padding:6px 4px;">Destination</th>
+                        <th style="padding:6px 4px;">Opérateur</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (h of selectedItemHistory(); track h.movementId) {
+                        <tr style="border-bottom:1px solid var(--border-light);">
+                          <td style="padding:6px 4px;">{{ h.movementDate | date:'dd/MM/yyyy' }}</td>
+                          <td style="padding:6px 4px;"><span style="font-family:monospace;color:var(--accent)">{{ h.movementNumber }}</span></td>
+                          <td style="padding:6px 4px;">{{ h.typeFr }}</td>
+                          <td style="padding:6px 4px;text-align:right;font-weight:600;">{{ h.quantity }} {{ unitFr(h.unit) }}</td>
+                          <td style="padding:6px 4px;color:var(--text-muted);">{{ h.sourceWarehouseName || h.supplierName || '—' }}</td>
+                          <td style="padding:6px 4px;color:var(--text-muted);">{{ h.destinationWarehouseName || h.departmentName || '—' }}</td>
+                          <td style="padding:6px 4px;color:var(--text-muted);">{{ h.createdByUser }}</td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                  <div style="display:flex; justify-content:space-between; align-items:center; padding-top:12px; margin-top:8px; border-top:1px solid var(--border);">
+                    <span style="font-size:11px; color:var(--text-muted);">Page {{ historyPage() }}</span>
+                    <div style="display:flex; gap:6px;">
+                      <button class="btn btn-secondary btn-xs" [disabled]="historyPage() <= 1" (click)="prevHistoryPage()">
+                        <i class="pi pi-chevron-left" style="font-size:10px;"></i> Précédent
+                      </button>
+                      <button class="btn btn-secondary btn-xs" [disabled]="!hasMoreHistory()" (click)="nextHistoryPage()">
+                        Suivant <i class="pi pi-chevron-right" style="font-size:10px;"></i>
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary btn-sm" (click)="showHistoryModal.set(false)">Fermer</button>
+            </div>
+          </div>
+        </div>
+      }
+      
+      <!-- Info Modal -->
+      @if (showInfoModal()) {
+        <div class="modal-overlay" style="z-index: 2100;">
+          <div class="modal-panel" style="max-width:500px;" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2 class="modal-title" style="display:flex;align-items:center;gap:8px;">
+                <i class="pi pi-info-circle" style="color:var(--accent)"></i>
+                Catalogue Articles
+              </h2>
+              <button class="modal-close" (click)="showInfoModal.set(false)"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="modal-body" style="font-size:14px;line-height:1.6;color:var(--text-primary);">
+              <p style="margin-bottom:16px;"><strong>Description :</strong><br>
+                Cette page regroupe le catalogue complet de vos matériaux de stockage avec le suivi de leurs quantités consolidées.
+              </p>
+              <p style="margin-bottom:8px;"><strong>Fonctionnalités clés :</strong></p>
+              <ul style="padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:6px;">
+                <li>🏷️ <strong>Nomenclature</strong> : Créez et modifiez des articles en précisant leur unité, marque, modèle et seuil bas.</li>
+                <li>🔍 <strong>Fiche Article</strong> : Cliquez sur l'icône de recherche pour ouvrir sa fiche détaillée, voir ses lots actifs et son historique des mouvements.</li>
+                <li>📊 <strong>Seuil Bas</strong> : Les articles dont le stock global est inférieur au seuil bas défini sont signalés en rouge.</li>
+                <li>⚙️ <strong>Désactivation & Suppression</strong> : Désactivez des articles obsolètes ou supprimez-les en toute sécurité.</li>
+              </ul>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" (click)="showInfoModal.set(false)">Fermer</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Delete Confirmation Modal -->
+      @if (showDeleteModal()) {
+        <div class="modal-overlay" style="z-index: 2000;">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper" style="background:rgba(239, 68, 68, 0.1);color:#ef4444;">
+              <i class="pi pi-exclamation-triangle"></i>
+            </div>
+            <h2 class="modal-title">Supprimer l'article</h2>
+            <p class="confirm-message">
+              {{ deleteModalMessage() }}
+            </p>
+            <div class="modal-footer" style="justify-content:center;margin-top:24px;gap:12px;">
+              <button class="btn btn-secondary" (click)="showDeleteModal.set(false)">Annuler</button>
+              <button class="btn btn-danger" (click)="executeDelete()">Supprimer</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Custom Alert Dialog -->
+      @if (customAlert()) {
+        <div class="modal-overlay" style="z-index: 2200;">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper" [style.background]="customAlert()?.severity === 'error' ? 'rgba(239, 68, 68, 0.1)' : (customAlert()?.severity === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)')" [style.color]="customAlert()?.severity === 'error' ? '#ef4444' : (customAlert()?.severity === 'success' ? '#10b981' : '#f59e0b')">
+              <i class="pi" [ngClass]="customAlert()?.severity === 'error' ? 'pi-times-circle' : (customAlert()?.severity === 'success' ? 'pi-check-circle' : 'pi-exclamation-triangle')"></i>
+            </div>
+            <h2 class="modal-title">{{ customAlert()?.title }}</h2>
+            <div class="confirm-message" style="text-align: left; margin-top: 12px; color: var(--text-primary);">
+              <p style="margin-bottom: 8px;">{{ customAlert()?.message }}</p>
+              @if (customAlert()?.list && customAlert()!.list!.length > 0) {
+                <ul style="padding-left: 20px; list-style-type: disc; display: flex; flex-direction: column; gap: 4px; color: var(--text-secondary);">
+                  @for (item of customAlert()!.list; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              }
+            </div>
+            <div class="modal-footer" style="justify-content: center; margin-top: 24px;">
+              <button class="btn btn-primary" (click)="closeCustomAlert()">D'accord</button>
             </div>
           </div>
         </div>
@@ -337,12 +548,35 @@ const UNIT_FR: Record<string, string> = {
 })
 export class StockItemsComponent implements OnInit {
   private stockService = inject(StockService);
+  private printService = inject(PrintService);
+  private exportService = inject(ExportService);
+  private route = inject(ActivatedRoute);
 
+  showInfoModal = signal(false);
+  customAlert = signal<{ title: string; message: string; severity?: 'error' | 'warning' | 'success'; list?: string[] } | null>(null);
+
+  closeCustomAlert() {
+    this.customAlert.set(null);
+  }
   loading = signal(true);
   saving = signal(false);
   showModal = signal(false);
   editItem = signal<StockItemDto | null>(null);
   itemToDeactivate = signal<StockItemDto | null>(null);
+
+  // New deletion signals
+  showDeleteModal = signal(false);
+  deleteModalMessage = signal('');
+  deleteAction = signal<(() => void) | null>(null);
+
+  // New Fiche Article / History signals
+  showHistoryModal = signal(false);
+  selectedItem = signal<StockItemDto | null>(null);
+  selectedItemLots = signal<StockLotDto[]>([]);
+  selectedItemHistory = signal<any[]>([]);
+  loadingHistory = signal(false);
+  historyPage = signal(1);
+  hasMoreHistory = signal(true);
 
   items = signal<StockItemDto[]>([]);
   suppliers = signal<SupplierDto[]>([]);
@@ -371,6 +605,14 @@ export class StockItemsComponent implements OnInit {
   ngOnInit() { 
     this.load(); 
     this.loadReferenceData();
+    this.route.queryParams.subscribe(params => {
+      const selectId = params['selectId'];
+      if (selectId) {
+        this.stockService.getStockItem(selectId).subscribe(item => {
+          if (item) this.openHistory(item);
+        });
+      }
+    });
   }
 
   loadReferenceData() {
@@ -516,7 +758,35 @@ export class StockItemsComponent implements OnInit {
     });
   }
 
+  validateForm(): boolean {
+    const missing: string[] = [];
+    if (!this.form.reference?.trim()) {
+      missing.push("Référence");
+    }
+    if (!this.form.name?.trim()) {
+      missing.push("Désignation");
+    }
+    if (!this.form.categoryId) {
+      missing.push("Catégorie");
+    }
+    if (!this.form.defaultUnit) {
+      missing.push("Unité par défaut");
+    }
+
+    if (missing.length > 0) {
+      this.customAlert.set({
+        title: "Formulaire incomplet",
+        message: "Veuillez renseigner les informations obligatoires :",
+        severity: "warning",
+        list: missing
+      });
+      return false;
+    }
+    return true;
+  }
+
   save() {
+    if (!this.validateForm()) return;
     this.saving.set(true);
     const payload = { 
       ...this.form, 
@@ -565,4 +835,108 @@ export class StockItemsComponent implements OnInit {
   }
 
   unitFr(u: string): string { return UNIT_FR[u] ?? u; }
+
+  exportCsv() {
+    const data = this.items().map(item => ({
+      'Référence': item.reference,
+      'Désignation': item.name,
+      'Catégorie': item.categoryName,
+      'Marque': item.brandName || '—',
+      'Modèle': item.brandModelName || '—',
+      'Unité par défaut': this.unitFr(item.defaultUnit),
+      'Qté totale': item.totalQuantity,
+      'Seuil stock faible': item.defaultLowStockThreshold,
+      'Statut': item.isActive ? 'Actif' : 'Inactif'
+    }));
+    this.exportService.exportToCsv(data, 'articles_stock');
+  }
+
+  confirmDelete(item: StockItemDto) {
+    this.deleteModalMessage.set(`Êtes-vous sûr de vouloir supprimer l'article "${item.name}" ?`);
+    this.deleteAction.set(() => this.deleteItem(item));
+    this.showDeleteModal.set(true);
+  }
+
+  deleteItem(item: StockItemDto) {
+    this.stockService.deleteStockItem(item.id).subscribe({
+      next: () => {
+        this.showDeleteModal.set(false);
+        this.load();
+      }
+    });
+  }
+
+  executeDelete() {
+    const action = this.deleteAction();
+    if (action) action();
+  }
+
+  openHistory(item: StockItemDto) {
+    this.selectedItem.set(item);
+    this.selectedItemLots.set([]);
+    this.selectedItemHistory.set([]);
+    this.historyPage.set(1);
+    this.hasMoreHistory.set(true);
+    this.showHistoryModal.set(true);
+    this.loadHistoryData();
+  }
+
+  loadHistoryData() {
+    const item = this.selectedItem();
+    if (!item) return;
+
+    this.loadingHistory.set(true);
+    
+    // Fetch active lots
+    this.stockService.getStockItemLots(item.id, false).subscribe({
+      next: (lots) => this.selectedItemLots.set(lots)
+    });
+
+    // Fetch movement history
+    this.stockService.getItemHistory(item.id, this.historyPage(), 10).subscribe({
+      next: (history) => {
+        this.selectedItemHistory.set(history);
+        this.hasMoreHistory.set(history.length >= 10);
+        this.loadingHistory.set(false);
+      },
+      error: () => this.loadingHistory.set(false)
+    });
+  }
+
+  prevHistoryPage() {
+    if (this.historyPage() > 1) {
+      this.historyPage.update(p => p - 1);
+      this.loadHistoryData();
+    }
+  }
+
+  nextHistoryPage() {
+    if (this.hasMoreHistory()) {
+      this.historyPage.update(p => p + 1);
+      this.loadHistoryData();
+    }
+  }
+
+  printItemCard() {
+    const item = this.selectedItem();
+    if (!item) return;
+    this.printService.printItemCard(item, this.selectedItemLots(), this.selectedItemHistory());
+  }
+
+  exportHistoryCsv() {
+    const item = this.selectedItem();
+    if (!item) return;
+    const data = this.selectedItemHistory().map(h => ({
+      'Date': new Date(h.movementDate).toLocaleDateString('fr-FR'),
+      'N° Mouvement': h.movementNumber,
+      'Type': h.typeFr || h.type,
+      'Quantité': h.quantity,
+      'Unité': this.unitFr(h.unit),
+      'Lot': h.lotNumber || '—',
+      'Provenance': h.sourceWarehouseName || h.supplierName || '—',
+      'Destination': h.destinationWarehouseName || h.departmentName || '—',
+      'Par': h.createdByUser || '—'
+    }));
+    this.exportService.exportToCsv(data, `historique_${item.reference}`);
+  }
 }

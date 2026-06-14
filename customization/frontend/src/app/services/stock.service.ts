@@ -272,4 +272,122 @@ export class StockService {
   deleteDepartment(id: string): Observable<void> {
     return this.http.delete<void>(`${this.base}/Departments/${id}`);
   }
+
+  // ── Lots ───────────────────────────────────
+  getLots(filters?: {
+    stockItemId?: string;
+    warehouseId?: string;
+    expiringOnly?: boolean;
+    lowStockOnly?: boolean;
+    excludeExpired?: boolean;
+    pageNumber?: number;
+    pageSize?: number;
+  }): Observable<any[]> {
+    let params = new HttpParams();
+    if (filters?.stockItemId) params = params.set('stockItemId', filters.stockItemId);
+    if (filters?.warehouseId) params = params.set('warehouseId', filters.warehouseId);
+    if (filters?.expiringOnly !== undefined) params = params.set('expiringOnly', filters.expiringOnly);
+    if (filters?.lowStockOnly !== undefined) params = params.set('lowStockOnly', filters.lowStockOnly);
+    if (filters?.excludeExpired !== undefined) params = params.set('excludeExpired', filters.excludeExpired);
+    if (filters?.pageNumber !== undefined) params = params.set('pageNumber', filters.pageNumber);
+    if (filters?.pageSize !== undefined) params = params.set('pageSize', filters.pageSize);
+    return this.http.get<any[]>(`${this.base}/Lots`, { params });
+  }
+
+  // ── Item History ────────────────────────────
+  getItemHistory(itemId: string, pageNumber?: number, pageSize?: number): Observable<any[]> {
+    let params = new HttpParams();
+    if (pageNumber !== undefined) params = params.set('pageNumber', pageNumber);
+    if (pageSize !== undefined) params = params.set('pageSize', pageSize);
+    return this.http.get<any[]>(`${this.base}/StockItems/${itemId}/history`, { params });
+  }
+
+  // ── Delete (soft) ───────────────────────────
+  deleteSupplier(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/Suppliers/${id}`);
+  }
+
+  deleteWarehouse(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/Warehouses/${id}`);
+  }
+
+  deleteStockItem(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/StockItems/${id}`);
+  }
+
+  // ── Reports ─────────────────────────────────
+  getConsumptionReport(filters?: { fromDate?: string; toDate?: string; departmentId?: string; warehouseId?: string }): Observable<any[]> {
+    let params = new HttpParams();
+    if (filters?.fromDate) params = params.set('fromDate', filters.fromDate);
+    if (filters?.toDate) params = params.set('toDate', filters.toDate);
+    if (filters?.departmentId) params = params.set('departmentId', filters.departmentId);
+    if (filters?.warehouseId) params = params.set('warehouseId', filters.warehouseId);
+    return this.http.get<any[]>(`${this.base}/Reports/consumption`, { params });
+  }
+
+  getValuationReport(warehouseId?: string): Observable<any[]> {
+    let params = new HttpParams();
+    if (warehouseId) params = params.set('warehouseId', warehouseId);
+    return this.http.get<any[]>(`${this.base}/Reports/valuation`, { params });
+  }
+
+  getMovementSummaryReport(fromDate?: string, toDate?: string): Observable<any[]> {
+    let params = new HttpParams();
+    if (fromDate) params = params.set('fromDate', fromDate);
+    if (toDate) params = params.set('toDate', toDate);
+    return this.http.get<any[]>(`${this.base}/Reports/movements-summary`, { params });
+  }
+
+  getTopItemsReport(fromDate?: string, toDate?: string, top = 10): Observable<any[]> {
+    let params = new HttpParams().set('top', top);
+    if (fromDate) params = params.set('fromDate', fromDate);
+    if (toDate) params = params.set('toDate', toDate);
+    return this.http.get<any[]>(`${this.base}/Reports/top-items`, { params });
+  }
+
+  // ── Inventory (Physical Counting) ───────────
+  startInventorySession(warehouseId: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/Inventory/start`, { warehouseId });
+  }
+
+  getInventorySession(sessionId: string): Observable<any> {
+    return this.http.get<any>(`${this.base}/Inventory/${sessionId}`);
+  }
+
+  saveInventoryCounts(sessionId: string, counts: { stockLotId: string; physicalQuantity: number }[]): Observable<any> {
+    return this.http.post<any>(`${this.base}/Inventory/${sessionId}/count`, counts);
+  }
+
+  getInventoryGaps(sessionId: string): Observable<any> {
+    return this.http.get<any>(`${this.base}/Inventory/${sessionId}/gaps`);
+  }
+
+  validateInventorySession(sessionId: string): Observable<any> {
+    return this.http.post<any>(`${this.base}/Inventory/${sessionId}/validate`, {});
+  }
+
+  // ── Alert Settings ──────────────────────────
+  getAlertSettings(): Observable<any> {
+    return this.http.get<any>(`${this.base}/Settings/alerts`);
+  }
+
+  updateAlertSettings(settings: { expiryWarningDays: number }): Observable<any> {
+    return this.http.put<any>(`${this.base}/Settings/alerts`, settings);
+  }
+
+  // ── Audit Logs ──────────────────────────────
+  getAuditLogs(filters?: { fromDate?: string; toDate?: string; user?: string; actionType?: string }): Observable<any[]> {
+    let params = new HttpParams();
+    if (filters?.fromDate) params = params.set('fromDate', filters.fromDate);
+    if (filters?.toDate) params = params.set('toDate', filters.toDate);
+    if (filters?.user) params = params.set('user', filters.user);
+    if (filters?.actionType) params = params.set('actionType', filters.actionType);
+    return this.http.get<any[]>(`${this.base}/Audit`, { params });
+  }
+
+  // ── Global Search ───────────────────────────
+  searchGlobal(query: string): Observable<any[]> {
+    let params = new HttpParams().set('q', query);
+    return this.http.get<any[]>(`${this.base}/Search`, { params });
+  }
 }

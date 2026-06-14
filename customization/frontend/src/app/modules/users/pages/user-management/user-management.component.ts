@@ -11,7 +11,10 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
     <div>
       <div class="page-header">
         <div>
-          <h1 class="page-title">Gestion des Utilisateurs</h1>
+          <h1 class="page-title" style="display:flex;align-items:center;gap:8px;">
+            Gestion des Utilisateurs
+            <i class="pi pi-info-circle" style="font-size:16px;color:var(--text-muted);cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'" (click)="showInfoModal.set(true)" title="À propos de cette page"></i>
+          </h1>
           <p class="page-subtitle">Gérez les comptes des collaborateurs, les rôles et les accès système</p>
         </div>
         <button class="btn btn-primary" (click)="openCreate()">
@@ -191,6 +194,36 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
           </div>
         </div>
       }
+
+      <!-- Info Modal -->
+      @if (showInfoModal()) {
+        <div class="modal-overlay" style="z-index: 2100;">
+          <div class="modal-panel" style="max-width:500px;" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2 class="modal-title" style="display:flex;align-items:center;gap:8px;">
+                <i class="pi pi-info-circle" style="color:var(--accent)"></i>
+                Gestion des Utilisateurs
+              </h2>
+              <button class="modal-close" (click)="showInfoModal.set(false)"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="modal-body" style="font-size:14px;line-height:1.6;color:var(--text-primary);">
+              <p style="margin-bottom:16px;"><strong>Description :</strong><br>
+                Cette page permet aux administrateurs de gérer l'ensemble des collaborateurs du système, de configurer leurs privilèges et de contrôler leurs accès.
+              </p>
+              <p style="margin-bottom:8px;"><strong>Fonctionnalités clés :</strong></p>
+              <ul style="padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:6px;">
+                <li>➕ <strong>Création de Comptes</strong> : Ajoutez de nouveaux comptes avec mot de passe initial, rôle et adresse e-mail.</li>
+                <li>🛠️ <strong>Gestion des Profils & Rôles</strong> : Modifiez les informations ou attribuez des rôles différents (Admin, Manager, Worker).</li>
+                <li>🚫 <strong>Activation / Désactivation</strong> : Bloquez ou réactivez temporairement un accès utilisateur en un clic.</li>
+                <li>🔍 <strong>Recherche rapide</strong> : Filtrez la liste des collaborateurs instantanément par nom d'utilisateur, nom complet ou e-mail.</li>
+              </ul>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" (click)="showInfoModal.set(false)">Fermer</button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [
@@ -259,6 +292,7 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
 export class UserManagementComponent implements OnInit {
   private authService = inject(AuthService);
 
+  showInfoModal = signal(false);
   currentUser = this.authService.currentUser;
 
   loading = signal(true);

@@ -1213,3 +1213,34 @@ html, body {
     color: #0f172a;
   }
 }
+
+/* ──────────────────────────────────────────────
+   Confirm Panels & Custom Alerts
+────────────────────────────────────────────── */
+.confirm-panel {
+  max-width: 400px !important;
+  text-align: center;
+  padding: 32px 24px !important;
+  margin: 0 auto;
+}
+
+.confirm-icon-wrapper {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  margin: 0 auto 16px;
+}
+
+.confirm-message {
+  color: var(--text-muted);
+  font-size: 14.5px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+

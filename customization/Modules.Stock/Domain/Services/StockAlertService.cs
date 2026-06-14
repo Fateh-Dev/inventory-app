@@ -5,16 +5,19 @@ using Microsoft.EntityFrameworkCore;
 using Modules.Stock.Domain.Entities;
 using Modules.Stock.Domain.Enums;
 using Modules.Stock.Infrastructure.Persistence;
+using Modules.Stock.Controllers;
 
 namespace Modules.Stock.Domain.Services;
 
 public class StockAlertService : IStockAlertService
 {
     private readonly StockDbContext _context;
+    private readonly IAlertSettingsService _settingsService;
 
-    public StockAlertService(StockDbContext context)
+    public StockAlertService(StockDbContext context, IAlertSettingsService settingsService)
     {
         _context = context;
+        _settingsService = settingsService;
     }
 
     public async Task CheckAndCreateAlertsAsync(StockItem item, CancellationToken ct = default)
@@ -50,14 +53,14 @@ public class StockAlertService : IStockAlertService
                     _context.StockAlerts.Add(alert);
                 }
             }
-            else if (lot.ExpiryDate.Value <= DateTime.UtcNow.AddDays(30))
+            else if (lot.ExpiryDate.Value <= DateTime.UtcNow.AddDays(_settingsService.GetSettings().ExpiryWarningDays))
             {
                 var exists = await _context.StockAlerts
                     .AnyAsync(a => a.StockItemId == item.Id && a.AlertType == "EXPIRING_SOON" && a.Message.Contains(lot.LotNumber.Value) && !a.IsResolved, ct);
 
                 if (!exists)
                 {
-                    var message = $"Lot {lot.LotNumber.Value} is expiring soon on {lot.ExpiryDate:d}.";
+                    var message = $"Lot {lot.LotNumber.Value} is expiring soon on {lot.ExpiryDate:d} (seuil: {_settingsService.GetSettings().ExpiryWarningDays} jours).";
                     var alert = StockAlert.Create(item.Id, lot.WarehouseId, AlertSeverity.Warning, message, "EXPIRING_SOON");
                     _context.StockAlerts.Add(alert);
                 }

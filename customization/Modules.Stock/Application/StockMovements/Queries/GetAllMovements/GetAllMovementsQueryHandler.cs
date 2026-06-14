@@ -116,7 +116,10 @@ public class GetAllMovementsQueryHandler : IRequestHandler<GetAllMovementsQuery,
                 Unit = l.Quantity.Unit.ToString(),
                 UnitCost = l.UnitCost.Amount,
                 Currency = l.UnitCost.Currency,
-                LineTotal = l.Quantity.Value * l.UnitCost.Amount
+                LineTotal = l.Quantity.Value * l.UnitCost.Amount,
+                Notes = l.Notes ?? string.Empty,
+                ExpiryDate = l.ExpiryDate,
+                SerialNumber = l.SerialNumber
             }).ToList() : new List<StockMovementLineDto>(),
             TotalValue = request.IncludeLines ? m.Lines.Sum(l => l.Quantity.Value * l.UnitCost.Amount) : 0
         });

@@ -15,4 +15,7 @@ public class StockMovementLineDto
     public decimal UnitCost { get; set; }
     public string Currency { get; set; } = string.Empty;
     public decimal LineTotal { get; set; }
+    public string Notes { get; set; } = string.Empty;
+    public DateTime? ExpiryDate { get; set; }
+    public string? SerialNumber { get; set; }
 }

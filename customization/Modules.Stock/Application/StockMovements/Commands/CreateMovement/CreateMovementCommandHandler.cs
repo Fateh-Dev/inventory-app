@@ -148,7 +148,10 @@ public class CreateMovementCommandHandler : IRequestHandler<CreateMovementComman
                 Unit = l.Quantity.Unit.ToString(),
                 UnitCost = l.UnitCost.Amount,
                 Currency = l.UnitCost.Currency,
-                LineTotal = l.Quantity.Value * l.UnitCost.Amount
+                LineTotal = l.Quantity.Value * l.UnitCost.Amount,
+                Notes = l.Notes ?? string.Empty,
+                ExpiryDate = l.ExpiryDate,
+                SerialNumber = l.SerialNumber
             }).ToList(),
             TotalValue = movement.Lines.Sum(l => l.Quantity.Value * l.UnitCost.Amount)
         };

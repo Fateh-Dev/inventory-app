@@ -1,13 +1,14 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, HostListener } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { StockService } from './services/stock.service';
 import { AuthService } from './services/auth.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
   template: `
     @if (!isAuthenticated()) {
       <main style="min-height: 100vh; width: 100vw;">
@@ -64,6 +65,21 @@ import { AuthService } from './services/auth.service';
               <span>Mouvements de stock</span>
             </a>
  
+            <a class="nav-item" routerLink="/lots" routerLinkActive="active">
+              <i class="pi pi-list"></i>
+              <span>Gestion des lots</span>
+            </a>
+
+            <a class="nav-item" routerLink="/inventory" routerLinkActive="active">
+              <i class="pi pi-check-square"></i>
+              <span>Inventaire physique</span>
+            </a>
+ 
+            <a class="nav-item" routerLink="/reports" routerLinkActive="active">
+              <i class="pi pi-chart-bar"></i>
+              <span>Rapports</span>
+            </a>
+ 
             <a class="nav-item" routerLink="/alerts" routerLinkActive="active">
               <i class="pi pi-bell"></i>
               <span>Alertes</span>
@@ -79,6 +95,11 @@ import { AuthService } from './services/auth.service';
               <span>Tables de référence</span>
             </a>
  
+            <a class="nav-item" routerLink="/audit" routerLinkActive="active">
+              <i class="pi pi-history"></i>
+              <span>Journal d'audit</span>
+            </a>
+
             @if (isAdmin()) {
               <div class="nav-label">Administration</div>
               <a class="nav-item" routerLink="/users" routerLinkActive="active">
@@ -123,6 +144,32 @@ import { AuthService } from './services/auth.service';
               </button>
               <div style="font-size: 13px; color: var(--text-muted)">
                 <span style="color: var(--success)">■</span> En ligne
+              </div>
+              
+              <!-- Recherche globale container -->
+              <div class="global-search-container" style="position:relative; margin-left: 20px; width: 320px; z-index:1000;">
+                <div style="position:relative; width: 100%;">
+                  <i class="pi pi-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted); font-size:13px;"></i>
+                  <input type="text" class="form-input" style="width:100%; padding-left:32px; font-size:12.5px; border-radius:18px; height:32px; background:var(--bg-base); border:1px solid var(--border);"
+                    [(ngModel)]="searchQuery" (ngModelChange)="onSearch()" placeholder="Recherche globale…" (focus)="showResults.set(true)">
+                  @if (searchQuery) {
+                    <i class="pi pi-times" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:var(--text-muted); font-size:11px; cursor:pointer;" (click)="clearSearch()"></i>
+                  }
+                </div>
+                <!-- Dropdown results -->
+                @if (showResults() && results().length > 0) {
+                  <div class="search-results-dropdown" style="position:absolute; top:36px; left:0; width:100%; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); max-height:300px; overflow-y:auto; padding:6px 0;">
+                    @for (r of results(); track $index) {
+                      <div (click)="selectResult(r)" style="padding:8px 12px; cursor:pointer; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--border-light); transition: background 0.15s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                        <i [class]="getSearchIcon(r.type)" style="color:var(--accent); font-size:14px; flex-shrink:0;"></i>
+                        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
+                          <div style="font-size:12.5px; font-weight:600; color:var(--text-primary);">{{ r.title }}</div>
+                          <div style="font-size:11px; color:var(--text-muted);">{{ r.subtitle }}</div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
@@ -175,6 +222,11 @@ export class AppComponent implements OnInit {
   unreadAlerts = signal(0);
   isLight = signal(true); // Défaut à vrai (mode clair)
   today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+  // Global search state
+  searchQuery = '';
+  results = signal<any[]>([]);
+  showResults = signal(false);
  
   ngOnInit() {
     const saved = localStorage.getItem('fth-theme');
@@ -216,6 +268,58 @@ export class AppComponent implements OnInit {
  
   logout() {
     this.authService.logout();
+  }
+
+  onSearch() {
+    if (!this.searchQuery.trim()) {
+      this.results.set([]);
+      return;
+    }
+    this.stockService.searchGlobal(this.searchQuery).subscribe(res => {
+      this.results.set(res);
+    });
+  }
+
+  clearSearch() {
+    this.searchQuery = '';
+    this.results.set([]);
+  }
+
+  getSearchIcon(type: string): string {
+    switch (type) {
+      case 'item': return 'pi pi-box';
+      case 'movement': return 'pi pi-arrow-right-arrow-left';
+      case 'supplier': return 'pi pi-truck';
+      case 'warehouse': return 'pi pi-building';
+      default: return 'pi pi-search';
+    }
+  }
+
+  selectResult(r: any) {
+    this.showResults.set(false);
+    this.clearSearch();
+    switch (r.type) {
+      case 'item':
+        this.router.navigate(['/stock-items'], { queryParams: { selectId: r.id } });
+        break;
+      case 'movement':
+        this.router.navigate(['/movements'], { queryParams: { selectId: r.id } });
+        break;
+      case 'supplier':
+        this.router.navigate(['/suppliers']);
+        break;
+      case 'warehouse':
+        this.router.navigate(['/warehouses']);
+        break;
+    }
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.global-search-container')) {
+      this.showResults.set(false);
+    }
   }
 }
 

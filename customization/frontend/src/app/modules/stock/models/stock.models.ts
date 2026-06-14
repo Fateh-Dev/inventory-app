@@ -116,6 +116,9 @@ export interface StockMovementLineDto {
   unitCost: number;
   currency: string;
   lineTotal: number;
+  notes?: string;
+  expiryDate?: string | Date;
+  serialNumber?: string;
 }
 
 export interface StockMovementDto {

@@ -3,6 +3,9 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StockService } from '../../../../services/stock.service';
 import { WarehouseDto } from '../../models/stock.models';
+import { ExportService } from '../../../../services/export.service';
+import { PrintService } from '../../../../services/print.service';
+import { Router } from '@angular/router';
 
 @Component({
   selector: 'app-warehouses',
@@ -12,12 +15,20 @@ import { WarehouseDto } from '../../models/stock.models';
     <div>
       <div class="page-header">
         <div>
-          <h1 class="page-title">Entrepôts</h1>
+          <h1 class="page-title" style="display:flex;align-items:center;gap:8px;">
+            Entrepôts
+            <i class="pi pi-info-circle" style="font-size:16px;color:var(--text-muted);cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'" (click)="showInfoModal.set(true)" title="À propos de cette page"></i>
+          </h1>
           <p class="page-subtitle">Gérez les emplacements de stockage de votre inventaire</p>
         </div>
-        <button class="btn btn-primary" (click)="openCreate()">
-          <i class="pi pi-plus"></i> Ajouter un entrepôt
-        </button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" (click)="exportCsv()">
+            <i class="pi pi-download"></i> Exporter CSV
+          </button>
+          <button class="btn btn-primary" (click)="openCreate()">
+            <i class="pi pi-plus"></i> Ajouter un entrepôt
+          </button>
+        </div>
       </div>
 
       <div class="filter-bar">
@@ -83,6 +94,9 @@ import { WarehouseDto } from '../../models/stock.models';
               </div>
 
               <div style="display:flex;gap:8px;">
+                <button class="btn btn-primary btn-sm" style="flex:1.2" (click)="openStock(wh)">
+                  <i class="pi pi-box"></i> Stock
+                </button>
                 <button class="btn btn-secondary btn-sm" style="flex:1" (click)="openEdit(wh)">
                   <i class="pi pi-pencil"></i> Modifier
                 </button>
@@ -95,6 +109,9 @@ import { WarehouseDto } from '../../models/stock.models';
                     <i class="pi pi-check"></i>
                   </button>
                 }
+                <button class="btn btn-danger btn-sm" (click)="confirmDelete(wh)" title="Supprimer">
+                  <i class="pi pi-trash"></i>
+                </button>
               </div>
             </div>
           }
@@ -181,6 +198,135 @@ import { WarehouseDto } from '../../models/stock.models';
           </div>
         </div>
       }
+
+      <!-- Delete Confirmation Modal -->
+      @if (showDeleteModal()) {
+        <div class="modal-overlay" style="z-index: 2000;">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper">
+              <i class="pi pi-exclamation-triangle"></i>
+            </div>
+            <h2 class="modal-title">Supprimer l'entrepôt</h2>
+            <p class="confirm-message">
+              {{ deleteModalMessage() }}<br>
+              Cette action est irréversible.
+            </p>
+            <div class="modal-footer" style="justify-content:center;margin-top:24px;gap:12px;">
+              <button class="btn btn-secondary" (click)="showDeleteModal.set(false)">Annuler</button>
+              <button class="btn btn-danger" (click)="executeDelete()">Oui, supprimer</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Modal Stock de l'entrepôt -->
+      @if (showStockModal() && selectedWarehouse()) {
+        <div class="modal-overlay" style="z-index: 1500;">
+          <div class="modal-panel" style="max-width:800px;" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div>
+                <h2 class="modal-title">Stock de l'entrepôt: {{ selectedWarehouse()?.name }}</h2>
+                <p style="font-size:12px;color:var(--text-muted);margin-top:2px;">Code: <code>{{ selectedWarehouse()?.code }}</code></p>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <button class="btn btn-secondary btn-sm" (click)="printStock()"><i class="pi pi-print"></i> Imprimer</button>
+                <button class="btn btn-secondary btn-sm" (click)="exportStockCsv()"><i class="pi pi-download"></i> Exporter CSV</button>
+                <button class="modal-close" (click)="showStockModal.set(false)"><i class="pi pi-times"></i></button>
+              </div>
+            </div>
+            <div class="modal-body" style="max-height: 60vh; overflow-y: auto;">
+              @if (loadingStock()) {
+                <div style="text-align:center;padding:30px;"><div class="spinner"></div></div>
+              } @else if (warehouseStock().length === 0) {
+                <p style="color:var(--text-muted);font-size:13px;text-align:center;padding:40px;">Aucun stock actuellement dans cet entrepôt</p>
+              } @else {
+                <table class="data-table" style="font-size:13px;">
+                  <thead>
+                    <tr>
+                      <th>Article / Désignation</th>
+                      <th>Référence</th>
+                      <th>N° Lot</th>
+                      <th>Péremption</th>
+                      <th style="text-align:right">Stock courant</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (lot of warehouseStock(); track lot.id) {
+                      @if (lot.currentQuantity > 0) {
+                        <tr>
+                          <td style="font-weight:600;color:var(--accent);cursor:pointer;" (click)="goToItem(lot.stockItemId)" title="Voir la fiche article">{{ lot.stockItemName }}</td>
+                          <td><span style="font-family:monospace;font-size:11px;background:rgba(14,165,233,0.08);padding:2px 7px;border-radius:4px;color:var(--accent);">{{ lot.stockItemReference }}</span></td>
+                          <td><code style="font-family:monospace;font-size:11px;">{{ lot.lotNumber }}</code></td>
+                          <td>{{ lot.expiryDate ? (lot.expiryDate | date:'dd/MM/yyyy') : '—' }}</td>
+                          <td style="text-align:right;font-weight:700;">{{ lot.currentQuantity }} {{ unitFr(lot.currentUnit) }}</td>
+                        </tr>
+                      }
+                    }
+                  </tbody>
+                </table>
+              }
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary btn-sm" (click)="showStockModal.set(false)">Fermer</button>
+            </div>
+          </div>
+        </div>
+      }
+      
+      <!-- Info Modal -->
+      @if (showInfoModal()) {
+        <div class="modal-overlay" style="z-index: 2100;">
+          <div class="modal-panel" style="max-width:500px;" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2 class="modal-title" style="display:flex;align-items:center;gap:8px;">
+                <i class="pi pi-info-circle" style="color:var(--accent)"></i>
+                Gestion des Entrepôts
+              </h2>
+              <button class="modal-close" (click)="showInfoModal.set(false)"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="modal-body" style="font-size:14px;line-height:1.6;color:var(--text-primary);">
+              <p style="margin-bottom:16px;"><strong>Description :</strong><br>
+                Ce module permet d'administrer les différents dépôts et zones de stockage de l'entreprise.
+              </p>
+              <p style="margin-bottom:8px;"><strong>Fonctionnalités clés :</strong></p>
+              <ul style="padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:6px;">
+                <li>🏢 <strong>Gestion des Dépôts</strong> : Enregistrez, modifiez et configurez les adresses et responsables de chaque entrepôt.</li>
+                <li>📦 <strong>Consultation de Stock</strong> : Visualisez le stock complet et détaillé d'un dépôt par lot.</li>
+                <li>🖨️ <strong>Rapport de Stock</strong> : Imprimez l'état physique ou téléchargez-le au format CSV.</li>
+                <li>🗑️ <strong>Désactivation & Suppression</strong> : Désactivez des entrepôts temporairement ou archivez-les de manière sécurisée.</li>
+              </ul>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" (click)="showInfoModal.set(false)">Fermer</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Custom Alert Dialog -->
+      @if (customAlert()) {
+        <div class="modal-overlay" style="z-index: 2200;">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper" [style.background]="customAlert()?.severity === 'error' ? 'rgba(239, 68, 68, 0.1)' : (customAlert()?.severity === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)')" [style.color]="customAlert()?.severity === 'error' ? '#ef4444' : (customAlert()?.severity === 'success' ? '#10b981' : '#f59e0b')">
+              <i class="pi" [ngClass]="customAlert()?.severity === 'error' ? 'pi-times-circle' : (customAlert()?.severity === 'success' ? 'pi-check-circle' : 'pi-exclamation-triangle')"></i>
+            </div>
+            <h2 class="modal-title">{{ customAlert()?.title }}</h2>
+            <div class="confirm-message" style="text-align: left; margin-top: 12px; color: var(--text-primary);">
+              <p style="margin-bottom: 8px;">{{ customAlert()?.message }}</p>
+              @if (customAlert()?.list && customAlert()!.list!.length > 0) {
+                <ul style="padding-left: 20px; list-style-type: disc; display: flex; flex-direction: column; gap: 4px; color: var(--text-secondary);">
+                  @for (item of customAlert()!.list; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              }
+            </div>
+            <div class="modal-footer" style="justify-content: center; margin-top: 24px;">
+              <button class="btn btn-primary" (click)="closeCustomAlert()">D'accord</button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [
@@ -215,7 +361,16 @@ import { WarehouseDto } from '../../models/stock.models';
 })
 export class WarehousesComponent implements OnInit {
   private stockService = inject(StockService);
+  private exportService = inject(ExportService);
+  private printService = inject(PrintService);
+  private router = inject(Router);
 
+  showInfoModal = signal(false);
+  customAlert = signal<{ title: string; message: string; severity?: 'error' | 'warning' | 'success'; list?: string[] } | null>(null);
+
+  closeCustomAlert() {
+    this.customAlert.set(null);
+  }
   loading = signal(true);
   saving = signal(false);
   showModal = signal(false);
@@ -223,6 +378,17 @@ export class WarehousesComponent implements OnInit {
   itemToDeactivate = signal<WarehouseDto | null>(null);
   items = signal<WarehouseDto[]>([]);
   filtered = signal<WarehouseDto[]>([]);
+
+  // Deletion properties
+  showDeleteModal = signal(false);
+  deleteModalMessage = signal('');
+  deleteAction = signal<(() => void) | null>(null);
+
+  // Stock Modal properties
+  showStockModal = signal(false);
+  selectedWarehouse = signal<WarehouseDto | null>(null);
+  warehouseStock = signal<any[]>([]);
+  loadingStock = signal(false);
 
   search = '';
   filterActive = false;
@@ -263,7 +429,32 @@ export class WarehousesComponent implements OnInit {
 
   closeModal() { this.showModal.set(false); }
 
+  validateForm(): boolean {
+    const missing: string[] = [];
+    if (!this.form.name?.trim()) {
+      missing.push("Nom");
+    }
+    if (!this.form.code?.trim()) {
+      missing.push("Code");
+    }
+    if (!this.form.responsiblePerson?.trim()) {
+      missing.push("Responsable");
+    }
+
+    if (missing.length > 0) {
+      this.customAlert.set({
+        title: "Formulaire incomplet",
+        message: "Veuillez renseigner les informations obligatoires suivants :",
+        severity: "warning",
+        list: missing
+      });
+      return false;
+    }
+    return true;
+  }
+
   save() {
+    if (!this.validateForm()) return;
     this.saving.set(true);
     const req = this.editItem()
       ? this.stockService.updateWarehouse(this.editItem()!.id, { id: this.editItem()!.id, ...this.form })
@@ -299,5 +490,107 @@ export class WarehousesComponent implements OnInit {
         this.saving.set(false);
       }
     });
+  }
+
+  unitFr(u: string): string {
+    const map: Record<string, string> = {
+      Piece: 'Pièce', Liter: 'Litre', Kilogram: 'Kg', Meter: 'Mètre',
+      SquareMeter: 'm²', CubicMeter: 'm³', Box: 'Carton', Pallet: 'Palette',
+      Roll: 'Rouleau', Bag: 'Sac', Can: 'Bidon', Set: 'Ensemble'
+    };
+    return map[u] ?? u;
+  }
+
+  exportCsv() {
+    const data = this.items().map(wh => ({
+      'Nom': wh.name,
+      'Code': wh.code,
+      'Responsable': wh.responsiblePerson,
+      'Description': wh.description || '—',
+      'Adresse': wh.street || '—',
+      'Ville': wh.city || '—',
+      'Wilaya': wh.wilaya || '—',
+      'Code postal': wh.postalCode || '—',
+      'Statut': wh.isActive ? 'Actif' : 'Inactif'
+    }));
+    this.exportService.exportToCsv(data, 'entrepot_list');
+  }
+
+  confirmDelete(item: WarehouseDto) {
+    this.deleteModalMessage.set(`Êtes-vous sûr de vouloir supprimer l'entrepôt "${item.name}" ?`);
+    this.deleteAction.set(() => this.deleteWarehouse(item));
+    this.showDeleteModal.set(true);
+  }
+
+  deleteWarehouse(item: WarehouseDto) {
+    this.stockService.deleteWarehouse(item.id).subscribe({
+      next: () => {
+        this.showDeleteModal.set(false);
+        this.load();
+      }
+    });
+  }
+
+  executeDelete() {
+    const action = this.deleteAction();
+    if (action) action();
+  }
+
+  openStock(item: WarehouseDto) {
+    this.selectedWarehouse.set(item);
+    this.warehouseStock.set([]);
+    this.showStockModal.set(true);
+    this.loadWarehouseStock();
+  }
+
+  loadWarehouseStock() {
+    const wh = this.selectedWarehouse();
+    if (!wh) return;
+
+    this.loadingStock.set(true);
+    this.stockService.getWarehouseStock(wh.id).subscribe({
+      next: (stock) => {
+        this.warehouseStock.set(stock);
+        this.loadingStock.set(false);
+      },
+      error: () => this.loadingStock.set(false)
+    });
+  }
+
+  printStock() {
+    const wh = this.selectedWarehouse();
+    if (!wh) return;
+    const headers = ['Désignation', 'Référence', 'N° Lot', 'Péremption', 'Stock courant'];
+    const rows = this.warehouseStock()
+      .filter(l => l.currentQuantity > 0)
+      .map(l => [
+        l.stockItemName,
+        l.stockItemReference,
+        l.lotNumber || '—',
+        l.expiryDate ? new Date(l.expiryDate).toLocaleDateString('fr-FR') : '—',
+        `${l.currentQuantity} ${this.unitFr(l.currentUnit)}`
+      ]);
+    this.printService.printReport(`Stock de l'entrepôt: ${wh.name}`, headers, rows);
+  }
+
+  exportStockCsv() {
+    const wh = this.selectedWarehouse();
+    if (!wh) return;
+    const data = this.warehouseStock()
+      .filter(l => l.currentQuantity > 0)
+      .map(l => ({
+        'Article': l.stockItemName,
+        'Référence': l.stockItemReference,
+        'N° Lot': l.lotNumber,
+        'Péremption': l.expiryDate ? new Date(l.expiryDate).toLocaleDateString('fr-FR') : '',
+        'Quantité': l.currentQuantity,
+        'Unité': this.unitFr(l.currentUnit)
+      }));
+    this.exportService.exportToCsv(data, `stock_entrepot_${wh.code}`);
+  }
+
+  goToItem(itemId: string) {
+    this.showStockModal.set(false);
+    this.router.navigate(['/stock-items'], { queryParams: { selectId: itemId } });
   }
 }
