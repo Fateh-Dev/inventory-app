@@ -30,7 +30,7 @@ public sealed class LotNumber : ValueObject
         return new LotNumber(value);
     }
 
-    public static implicit operator string(LotNumber lotNumber) => lotNumber.Value;
+    public static implicit operator string(LotNumber lotNumber) => lotNumber?.Value;
 
     protected override IEnumerable<object> GetAtomicValues()
     {

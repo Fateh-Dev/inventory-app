@@ -10,7 +10,10 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
   template: `
     <div class="page-header">
       <div>
-        <h1 class="page-title">Mon Profil</h1>
+        <h1 class="page-title" style="display:flex;align-items:center;gap:8px;">
+          Mon Profil
+          <i class="pi pi-info-circle" style="font-size:16px;color:var(--text-muted);cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'" (click)="showInfoModal.set(true)" title="À propos de cette page"></i>
+        </h1>
         <p class="page-subtitle">Gérez vos informations personnelles et votre sécurité</p>
       </div>
     </div>
@@ -192,6 +195,35 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
               }
             </button>
           </form>
+        </div>
+      </div>
+    }
+
+    <!-- Info Modal -->
+    @if (showInfoModal()) {
+      <div class="modal-overlay" style="z-index: 2100;">
+        <div class="modal-panel" style="max-width:500px;" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <h2 class="modal-title" style="display:flex;align-items:center;gap:8px;">
+              <i class="pi pi-info-circle" style="color:var(--accent)"></i>
+              Mon Profil
+            </h2>
+            <button class="modal-close" (click)="showInfoModal.set(false)"><i class="pi pi-times"></i></button>
+          </div>
+          <div class="modal-body" style="font-size:14px;line-height:1.6;color:var(--text-primary);">
+            <p style="margin-bottom:16px;"><strong>Description :</strong><br>
+              Cette page vous permet de gérer vos informations d'utilisateur personnelles ainsi que la sécurité de votre compte en changeant de mot de passe.
+            </p>
+            <p style="margin-bottom:8px;"><strong>Fonctionnalités clés :</strong></p>
+            <ul style="padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:6px;">
+              <li>👤 <strong>Informations Personnelles</strong> : Modifiez votre nom complet et votre adresse e-mail.</li>
+              <li>🔒 <strong>Sécurité du Compte</strong> : Changez votre mot de passe actuel avec un indicateur de sécurité en temps réel.</li>
+              <li>🏷️ <strong>Rôle / Habilitation</strong> : Visualisez votre rôle système actuel (ex. Administrateur).</li>
+            </ul>
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-secondary" (click)="showInfoModal.set(false)">Fermer</button>
+          </div>
         </div>
       </div>
     }
@@ -380,6 +412,7 @@ export class ProfileComponent implements OnInit {
   private fb = inject(FormBuilder);
   private authService = inject(AuthService);
 
+  showInfoModal = signal(false);
   user = this.authService.currentUser;
 
   isInfoLoading = signal(false);

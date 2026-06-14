@@ -49,7 +49,7 @@ public class ConfirmMovementCommandHandler : IRequestHandler<ConfirmMovementComm
             if (movement.Type == StockMovementType.Reception)
             {
                 var lotNum = LotNumber.Create($"LOT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}");
-                var newLot = StockLot.Create(item.Id, movement.DestinationWarehouseId!.Value, lotNum, line.Quantity, line.UnitCost, null, item.DefaultLowStockThreshold, null);
+                var newLot = StockLot.Create(item.Id, movement.DestinationWarehouseId!.Value, lotNum, line.Quantity, line.UnitCost, line.ExpiryDate, item.DefaultLowStockThreshold, line.SerialNumber);
                 _context.StockLots.Add(newLot);
                 
                 line.SetStockLotId(newLot.Id);

@@ -7,6 +7,7 @@ using Modules.Stock.Application.StockItems.Commands.CreateStockItem;
 using Modules.Stock.Application.StockItems.Commands.DeactivateStockItem;
 using Modules.Stock.Application.StockItems.Commands.UpdateStockItem;
 using Modules.Stock.Application.StockItems.Queries.GetAllStockItems;
+using Modules.Stock.Application.StockItems.Queries.GetItemHistory;
 using Modules.Stock.Application.StockItems.Queries.GetLotsByStockItem;
 using Modules.Stock.Application.StockItems.Queries.GetStockItemById;
 using Modules.Stock.Domain.Enums;
@@ -86,5 +87,21 @@ public class StockItemsController : ControllerBase
         var result = await _mediator.Send(new GetLotsByStockItemQuery(id, excludeExpired));
         if (!result.IsSuccess) return NotFound(result.Error);
         return Ok(result.Value);
+    }
+
+    [HttpGet("{id}/history")]
+    public async Task<IActionResult> GetHistory(Guid id, [FromQuery] int? pageNumber, [FromQuery] int? pageSize)
+    {
+        var result = await _mediator.Send(new GetItemHistoryQuery(id, pageNumber, pageSize));
+        if (!result.IsSuccess) return NotFound(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var result = await _mediator.Send(new DeactivateStockItemCommand(id));
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return NoContent();
     }
 }

@@ -70,4 +70,13 @@ public class SuppliersController : ControllerBase
         if (!result.IsSuccess) return NotFound(result.Error);
         return Ok(result.Value);
     }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        // Soft delete via deactivate — preserves FK integrity
+        var result = await _mediator.Send(new DeactivateSupplierCommand(id));
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return NoContent();
+    }
 }

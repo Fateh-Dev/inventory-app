@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StockService } from '../../../../services/stock.service';
 import { SupplierDto } from '../../models/stock.models';
+import { ExportService } from '../../../../services/export.service';
 
 @Component({
   selector: 'app-suppliers',
@@ -12,12 +13,20 @@ import { SupplierDto } from '../../models/stock.models';
     <div>
       <div class="page-header">
         <div>
-          <h1 class="page-title">Fournisseurs</h1>
+          <h1 class="page-title" style="display:flex;align-items:center;gap:8px;">
+            Fournisseurs
+            <i class="pi pi-info-circle" style="font-size:16px;color:var(--text-muted);cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'" (click)="showInfoModal.set(true)" title="À propos de cette page"></i>
+          </h1>
           <p class="page-subtitle">Gérez vos fournisseurs de matériaux et contacts vendeurs</p>
         </div>
-        <button class="btn btn-primary" (click)="openCreate()">
-          <i class="pi pi-plus"></i> Ajouter un fournisseur
-        </button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-secondary" (click)="exportCsv()">
+            <i class="pi pi-download"></i> Exporter CSV
+          </button>
+          <button class="btn btn-primary" (click)="openCreate()">
+            <i class="pi pi-plus"></i> Ajouter un fournisseur
+          </button>
+        </div>
       </div>
 
       <div class="filter-bar">
@@ -101,6 +110,9 @@ import { SupplierDto } from '../../models/stock.models';
                           <i class="pi pi-check"></i>
                         </button>
                       }
+                      <button class="btn btn-danger btn-sm" (click)="confirmDelete(s)" title="Supprimer">
+                        <i class="pi pi-trash"></i>
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -196,6 +208,81 @@ import { SupplierDto } from '../../models/stock.models';
           </div>
         </div>
       }
+
+      <!-- Delete Confirmation Modal -->
+      @if (showDeleteModal()) {
+        <div class="modal-overlay" style="z-index: 2000;">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper">
+              <i class="pi pi-exclamation-triangle"></i>
+            </div>
+            <h2 class="modal-title">Supprimer le fournisseur</h2>
+            <p class="confirm-message">
+              {{ deleteModalMessage() }}<br>
+              Cette action est irréversible.
+            </p>
+            <div class="modal-footer" style="justify-content:center;margin-top:24px;gap:12px;">
+              <button class="btn btn-secondary" (click)="showDeleteModal.set(false)">Annuler</button>
+              <button class="btn btn-danger" (click)="executeDelete()">Oui, supprimer</button>
+            </div>
+          </div>
+        </div>
+      }
+      
+      <!-- Info Modal -->
+      @if (showInfoModal()) {
+        <div class="modal-overlay" style="z-index: 2100;">
+          <div class="modal-panel" style="max-width:500px;" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2 class="modal-title" style="display:flex;align-items:center;gap:8px;">
+                <i class="pi pi-info-circle" style="color:var(--accent)"></i>
+                Gestion des Fournisseurs
+              </h2>
+              <button class="modal-close" (click)="showInfoModal.set(false)"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="modal-body" style="font-size:14px;line-height:1.6;color:var(--text-primary);">
+              <p style="margin-bottom:16px;"><strong>Description :</strong><br>
+                Cette page contient l'annuaire de tous vos partenaires fournisseurs auprès desquels vous approvisionnez votre matériel.
+              </p>
+              <p style="margin-bottom:8px;"><strong>Fonctionnalités clés :</strong></p>
+              <ul style="padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:6px;">
+                <li>🤝 <strong>Base Fournisseurs</strong> : Créez et mettez à jour les fiches de vos fournisseurs (téléphone, email, wilaya, personne de contact).</li>
+                <li>📝 <strong>Activation/Désactivation</strong> : Désactivez temporairement un fournisseur pour l'empêcher d'apparaître dans les réceptions.</li>
+                <li>❌ <strong>Soft Delete</strong> : Supprimez les fournisseurs obsolètes via une modale de validation.</li>
+                <li>⬇️ <strong>Export CSV</strong> : Téléchargez l'annuaire des contacts au format CSV.</li>
+              </ul>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" (click)="showInfoModal.set(false)">Fermer</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Custom Alert Dialog -->
+      @if (customAlert()) {
+        <div class="modal-overlay" style="z-index: 2200;">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper" [style.background]="customAlert()?.severity === 'error' ? 'rgba(239, 68, 68, 0.1)' : (customAlert()?.severity === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)')" [style.color]="customAlert()?.severity === 'error' ? '#ef4444' : (customAlert()?.severity === 'success' ? '#10b981' : '#f59e0b')">
+              <i class="pi" [ngClass]="customAlert()?.severity === 'error' ? 'pi-times-circle' : (customAlert()?.severity === 'success' ? 'pi-check-circle' : 'pi-exclamation-triangle')"></i>
+            </div>
+            <h2 class="modal-title">{{ customAlert()?.title }}</h2>
+            <div class="confirm-message" style="text-align: left; margin-top: 12px; color: var(--text-primary);">
+              <p style="margin-bottom: 8px;">{{ customAlert()?.message }}</p>
+              @if (customAlert()?.list && customAlert()!.list!.length > 0) {
+                <ul style="padding-left: 20px; list-style-type: disc; display: flex; flex-direction: column; gap: 4px; color: var(--text-secondary);">
+                  @for (item of customAlert()!.list; track item) {
+                    <li>{{ item }}</li>
+                  }
+                </ul>
+              }
+            </div>
+            <div class="modal-footer" style="justify-content: center; margin-top: 24px;">
+              <button class="btn btn-primary" (click)="closeCustomAlert()">D'accord</button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [
@@ -230,7 +317,14 @@ import { SupplierDto } from '../../models/stock.models';
 })
 export class SuppliersComponent implements OnInit {
   private stockService = inject(StockService);
+  private exportService = inject(ExportService);
 
+  showInfoModal = signal(false);
+  customAlert = signal<{ title: string; message: string; severity?: 'error' | 'warning' | 'success'; list?: string[] } | null>(null);
+
+  closeCustomAlert() {
+    this.customAlert.set(null);
+  }
   loading = signal(true);
   saving = signal(false);
   showModal = signal(false);
@@ -238,6 +332,11 @@ export class SuppliersComponent implements OnInit {
   itemToDeactivate = signal<SupplierDto | null>(null);
   items = signal<SupplierDto[]>([]);
   filtered = signal<SupplierDto[]>([]);
+
+  // Deletion properties
+  showDeleteModal = signal(false);
+  deleteModalMessage = signal('');
+  deleteAction = signal<(() => void) | null>(null);
 
   search = '';
   filterActive = false;
@@ -272,7 +371,29 @@ export class SuppliersComponent implements OnInit {
 
   closeModal() { this.showModal.set(false); }
 
+  validateForm(): boolean {
+    const missing: string[] = [];
+    if (!this.form.name?.trim()) {
+      missing.push("Raison sociale");
+    }
+    if (!this.form.contactPerson?.trim()) {
+      missing.push("Personne de contact");
+    }
+
+    if (missing.length > 0) {
+      this.customAlert.set({
+        title: "Formulaire incomplet",
+        message: "Veuillez renseigner les informations obligatoires suivants :",
+        severity: "warning",
+        list: missing
+      });
+      return false;
+    }
+    return true;
+  }
+
   save() {
+    if (!this.validateForm()) return;
     this.saving.set(true);
     const req = this.editItem()
       ? this.stockService.updateSupplier(this.editItem()!.id, { id: this.editItem()!.id, ...this.form })
@@ -308,5 +429,40 @@ export class SuppliersComponent implements OnInit {
         this.saving.set(false);
       }
     });
+  }
+
+  exportCsv() {
+    const data = this.items().map(s => ({
+      'Raison sociale': s.name,
+      'Personne de contact': s.contactPerson,
+      'Téléphone': s.phone,
+      'E-mail': s.email,
+      'Adresse': s.street || '—',
+      'Ville': s.city || '—',
+      'Wilaya': s.wilaya || '—',
+      'Code postal': s.postalCode || '—',
+      'Statut': s.isActive ? 'Actif' : 'Inactif'
+    }));
+    this.exportService.exportToCsv(data, 'fournisseurs_stock');
+  }
+
+  confirmDelete(item: SupplierDto) {
+    this.deleteModalMessage.set(`Êtes-vous sûr de vouloir supprimer le fournisseur "${item.name}" ?`);
+    this.deleteAction.set(() => this.deleteSupplier(item));
+    this.showDeleteModal.set(true);
+  }
+
+  deleteSupplier(item: SupplierDto) {
+    this.stockService.deleteSupplier(item.id).subscribe({
+      next: () => {
+        this.showDeleteModal.set(false);
+        this.load();
+      }
+    });
+  }
+
+  executeDelete() {
+    const action = this.deleteAction();
+    if (action) action();
   }
 }

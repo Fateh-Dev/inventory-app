@@ -55,6 +55,30 @@ export const routes: Routes = [
       import('./modules/stock/pages/reference-data/reference-data.component').then(m => m.ReferenceDataComponent)
   },
   {
+    path: 'lots',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./modules/stock/pages/lots/lots.component').then(m => m.LotsComponent)
+  },
+  {
+    path: 'reports',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./modules/stock/pages/reports/reports.component').then(m => m.ReportsComponent)
+  },
+  {
+    path: 'inventory',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./modules/stock/pages/inventory/inventory.component').then(m => m.InventoryComponent)
+  },
+  {
+    path: 'audit',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./modules/stock/pages/audit/audit.component').then(m => m.AuditComponent)
+  },
+  {
     path: 'profile',
     canActivate: [authGuard],
     loadComponent: () =>

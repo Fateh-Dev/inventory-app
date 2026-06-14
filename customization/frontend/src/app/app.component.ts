@@ -1,20 +1,22 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, HostListener } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { StockService } from './services/stock.service';
 import { AuthService } from './services/auth.service';
+import { TranslationService } from './services/translation.service';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive],
+  imports: [CommonModule, RouterOutlet, RouterLink, RouterLinkActive, FormsModule],
   template: `
     @if (!isAuthenticated()) {
       <main style="min-height: 100vh; width: 100vw;">
         <router-outlet></router-outlet>
       </main>
     } @else {
-      <div class="app-shell">
+      <div class="app-shell" [dir]="t.currentLang() === 'ar' ? 'rtl' : 'ltr'">
         <!-- Barre latérale -->
         <aside class="sidebar" [class.collapsed]="isCollapsed()">
           <div class="sidebar-brand">
@@ -26,64 +28,84 @@ import { AuthService } from './services/auth.service';
                 </svg>
               </div>
               <div>
-                <div class="brand-name">FTH Stock</div>
-                <div class="brand-sub">Matériaux d'Infrastructure</div>
+                <div class="brand-name">{{ t.t('brand_name') }}</div>
+                <div class="brand-sub">{{ t.t('brand_sub') }}</div>
               </div>
             </a>
           </div>
  
           <nav class="nav-section">
-            <div class="nav-label">Vue d'ensemble</div>
+            <div class="nav-label">{{ t.t('overview') }}</div>
  
             <a class="nav-item" routerLink="/dashboard" routerLinkActive="active">
               <i class="pi pi-chart-bar"></i>
-              <span>Tableau de bord</span>
+              <span>{{ t.t('dashboard') }}</span>
             </a>
  
-            <div class="nav-label">Inventaire</div>
+            <div class="nav-label">{{ t.t('inventory') }}</div>
  
             <a class="nav-item" routerLink="/stock-items" routerLinkActive="active">
               <i class="pi pi-box"></i>
-              <span>Articles en stock</span>
+              <span>{{ t.t('stock_items') }}</span>
             </a>
  
             <a class="nav-item" routerLink="/warehouses" routerLinkActive="active">
               <i class="pi pi-building"></i>
-              <span>Entrepôts</span>
+              <span>{{ t.t('warehouses') }}</span>
             </a>
  
             <a class="nav-item" routerLink="/suppliers" routerLinkActive="active">
               <i class="pi pi-truck"></i>
-              <span>Fournisseurs</span>
+              <span>{{ t.t('suppliers') }}</span>
             </a>
  
-            <div class="nav-label">Opérations</div>
+            <div class="nav-label">{{ t.t('operations') }}</div>
  
             <a class="nav-item" routerLink="/movements" routerLinkActive="active">
               <i class="pi pi-arrow-right-arrow-left"></i>
-              <span>Mouvements de stock</span>
+              <span>{{ t.t('movements') }}</span>
+            </a>
+ 
+            <a class="nav-item" routerLink="/lots" routerLinkActive="active">
+              <i class="pi pi-list"></i>
+              <span>{{ t.t('lots') }}</span>
+            </a>
+ 
+            <a class="nav-item" routerLink="/inventory" routerLinkActive="active">
+              <i class="pi pi-check-square"></i>
+              <span>{{ t.t('physical_inventory') }}</span>
+            </a>
+ 
+            <a class="nav-item" routerLink="/reports" routerLinkActive="active">
+              <i class="pi pi-chart-bar"></i>
+              <span>{{ t.t('reports') }}</span>
             </a>
  
             <a class="nav-item" routerLink="/alerts" routerLinkActive="active">
               <i class="pi pi-bell"></i>
-              <span>Alertes</span>
+              <span>{{ t.t('alerts') }}</span>
               @if (unreadAlerts() > 0) {
                 <span class="nav-badge">{{ unreadAlerts() }}</span>
               }
             </a>
  
-            <div class="nav-label">Configuration</div>
+            <div class="nav-label">{{ t.t('config') }}</div>
  
             <a class="nav-item" routerLink="/reference-data" routerLinkActive="active">
               <i class="pi pi-cog"></i>
-              <span>Tables de référence</span>
+              <span>{{ t.t('reference_data') }}</span>
+            </a>
+ 
+            <a class="nav-item" routerLink="/audit" routerLinkActive="active">
+              <i class="pi pi-history"></i>
+              <span>{{ t.t('audit') }}</span>
             </a>
  
             @if (isAdmin()) {
-              <div class="nav-label">Administration</div>
+              <div class="nav-label">{{ t.t('users') }}</div>
               <a class="nav-item" routerLink="/users" routerLinkActive="active">
                 <i class="pi pi-users"></i>
-                <span>Utilisateurs</span>
+                <span>{{ t.t('users') }}</span>
               </a>
             }
           </nav>
@@ -105,7 +127,7 @@ import { AuthService } from './services/auth.service';
             </a>
             <button (click)="logout()" class="btn btn-secondary btn-sm sidebar-footer-btn" style="width: 100%; justify-content: center; gap: 6px;">
               <i class="pi pi-sign-out"></i>
-              <span>Déconnexion</span>
+              <span>{{ t.t('logout') }}</span>
             </button>
           </div>
         </aside>
@@ -122,10 +144,44 @@ import { AuthService } from './services/auth.service';
                 </svg>
               </button>
               <div style="font-size: 13px; color: var(--text-muted)">
-                <span style="color: var(--success)">■</span> En ligne
+                <span style="color: var(--success)">■</span> {{ t.t('online') }}
+              </div>
+              
+              <!-- Recherche globale container -->
+              <div class="global-search-container" style="position:relative; margin-left: 20px; width: 320px; z-index:1000;">
+                <div style="position:relative; width: 100%;">
+                  <i class="pi pi-search" style="position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--text-muted); font-size:13px;"></i>
+                  <input type="text" class="form-input" style="width:100%; padding-left:32px; font-size:12.5px; border-radius:18px; height:32px; background:var(--bg-base); border:1px solid var(--border);"
+                    [(ngModel)]="searchQuery" (ngModelChange)="onSearch()" [placeholder]="t.t('search_placeholder')" (focus)="showResults.set(true)">
+                  @if (searchQuery) {
+                    <i class="pi pi-times" style="position:absolute; right:12px; top:50%; transform:translateY(-50%); color:var(--text-muted); font-size:11px; cursor:pointer;" (click)="clearSearch()"></i>
+                  }
+                </div>
+                <!-- Dropdown results -->
+                @if (showResults() && results().length > 0) {
+                  <div class="search-results-dropdown" style="position:absolute; top:36px; left:0; width:100%; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); max-height:300px; overflow-y:auto; padding:6px 0;">
+                    @for (r of results(); track $index) {
+                      <div (click)="selectResult(r)" style="padding:8px 12px; cursor:pointer; display:flex; align-items:center; gap:8px; border-bottom:1px solid var(--border-light); transition: background 0.15s;" onmouseover="this.style.background='var(--bg-hover)'" onmouseout="this.style.background='transparent'">
+                        <i [class]="getSearchIcon(r.type)" style="color:var(--accent); font-size:14px; flex-shrink:0;"></i>
+                        <div style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">
+                          <div style="font-size:12.5px; font-weight:600; color:var(--text-primary);">{{ r.title }}</div>
+                          <div style="font-size:11px; color:var(--text-muted);">{{ r.subtitle }}</div>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                }
               </div>
             </div>
             <div style="display: flex; align-items: center; gap: 12px;">
+              <!-- Selecteur de langue -->
+              <select class="form-select" style="width: auto; padding: 4px 10px; font-size: 12px; height: 32px; border-radius: 20px; font-weight: 600; cursor: pointer; background: var(--bg-base); border: 1px solid var(--border); color: var(--text-muted); font-family: inherit; outline: none;"
+                      [ngModel]="t.currentLang()" (ngModelChange)="t.setLanguage($event)">
+                <option value="fr">Français</option>
+                <option value="en">English</option>
+                <option value="ar">العربية</option>
+              </select>
+
               @if (unreadAlerts() > 0) {
                 <a routerLink="/alerts" style="position: relative; cursor: pointer;">
                   <i class="pi pi-bell" style="font-size: 17px; color: var(--text-muted)"></i>
@@ -150,7 +206,7 @@ import { AuthService } from './services/auth.service';
               </button>
  
               <div style="width: 1px; height: 20px; background: var(--border)"></div>
-              <div style="font-size: 12px; color: var(--text-muted)">{{ today }}</div>
+              <div style="font-size: 12px; color: var(--text-muted)">{{ getToday() }}</div>
             </div>
           </header>
  
@@ -166,6 +222,7 @@ export class AppComponent implements OnInit {
   private stockService = inject(StockService);
   private authService = inject(AuthService);
   private router = inject(Router);
+  public t = inject(TranslationService);
  
   isAuthenticated = this.authService.isAuthenticated;
   currentUser = this.authService.currentUser;
@@ -174,11 +231,14 @@ export class AppComponent implements OnInit {
   isCollapsed = signal(false);
   unreadAlerts = signal(0);
   isLight = signal(true); // Défaut à vrai (mode clair)
-  today = new Date().toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+ 
+  // Global search state
+  searchQuery = '';
+  results = signal<any[]>([]);
+  showResults = signal(false);
  
   ngOnInit() {
     const saved = localStorage.getItem('fth-theme');
-    // Si 'dark', on applique le mode sombre. Sinon (si 'light' ou rien), on reste en clair.
     if (saved === 'dark') {
       this.isLight.set(false);
       document.documentElement.classList.add('dark');
@@ -217,5 +277,62 @@ export class AppComponent implements OnInit {
   logout() {
     this.authService.logout();
   }
-}
 
+  onSearch() {
+    if (!this.searchQuery.trim()) {
+      this.results.set([]);
+      return;
+    }
+    this.stockService.searchGlobal(this.searchQuery).subscribe(res => {
+      this.results.set(res);
+    });
+  }
+
+  clearSearch() {
+    this.searchQuery = '';
+    this.results.set([]);
+  }
+
+  getSearchIcon(type: string): string {
+    switch (type) {
+      case 'item': return 'pi pi-box';
+      case 'movement': return 'pi pi-arrow-right-arrow-left';
+      case 'supplier': return 'pi pi-truck';
+      case 'warehouse': return 'pi pi-building';
+      default: return 'pi pi-search';
+    }
+  }
+
+  selectResult(r: any) {
+    this.showResults.set(false);
+    this.clearSearch();
+    switch (r.type) {
+      case 'item':
+        this.router.navigate(['/stock-items'], { queryParams: { selectId: r.id } });
+        break;
+      case 'movement':
+        this.router.navigate(['/movements'], { queryParams: { selectId: r.id } });
+        break;
+      case 'supplier':
+        this.router.navigate(['/suppliers']);
+        break;
+      case 'warehouse':
+        this.router.navigate(['/warehouses']);
+        break;
+    }
+  }
+
+  getToday(): string {
+    const lang = this.t.currentLang();
+    const locale = lang === 'ar' ? 'ar-DZ' : (lang === 'en' ? 'en-US' : 'fr-FR');
+    return new Date().toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+    if (!target.closest('.global-search-container')) {
+      this.showResults.set(false);
+    }
+  }
+}

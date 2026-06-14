@@ -15,7 +15,10 @@ const ALERT_TYPE_FR: Record<string, string> = { LOW_STOCK: 'Stock faible', EXPIR
     <div>
       <div class="page-header">
         <div>
-          <h1 class="page-title">Alertes de stock</h1>
+          <h1 class="page-title" style="display:flex;align-items:center;gap:8px;">
+            Alertes de stock
+            <i class="pi pi-info-circle" style="font-size:16px;color:var(--text-muted);cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'" (click)="showInfoModal.set(true)" title="À propos de cette page"></i>
+          </h1>
           <p class="page-subtitle">Surveillez les stocks faibles, les lots expirants et autres avertissements</p>
         </div>
         <div style="display:flex;gap:8px;">
@@ -153,11 +156,43 @@ const ALERT_TYPE_FR: Record<string, string> = { LOW_STOCK: 'Stock faible', EXPIR
           }
         </div>
       }
+      
+      <!-- Info Modal -->
+      @if (showInfoModal()) {
+        <div class="modal-overlay" style="z-index: 2100;">
+          <div class="modal-panel" style="max-width:500px;" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <h2 class="modal-title" style="display:flex;align-items:center;gap:8px;">
+                <i class="pi pi-info-circle" style="color:var(--accent)"></i>
+                Alertes de Stock
+              </h2>
+              <button class="modal-close" (click)="showInfoModal.set(false)"><i class="pi pi-times"></i></button>
+            </div>
+            <div class="modal-body" style="font-size:14px;line-height:1.6;color:var(--text-primary);">
+              <p style="margin-bottom:16px;"><strong>Description :</strong><br>
+                Ce centre de notification liste en temps réel toutes les anomalies de stock nécessitant votre attention.
+              </p>
+              <p style="margin-bottom:8px;"><strong>Fonctionnalités clés :</strong></p>
+              <ul style="padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:6px;">
+                <li>🔴 <strong>Gestion de Gravité</strong> : Visualisez les niveaux d'urgence (Critique, Warning, Info).</li>
+                <li>👁️ <strong>Marquage de lecture</strong> : Masquez les alertes pour nettoyer votre flux une fois consultées.</li>
+                <li>✅ <strong>Résolution motivée</strong> : Résolvez une alerte en saisissant une note de justification (ex. "Commande en cours").</li>
+                <li>📦 <strong>Types d'alertes</strong> : Notifications automatiques de rupture de stock ou de péremption imminente.</li>
+              </ul>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-secondary" (click)="showInfoModal.set(false)">Fermer</button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `
 })
 export class AlertsComponent implements OnInit {
   private stockService = inject(StockService);
+
+  showInfoModal = signal(false);
 
   loading = signal(true);
   items = signal<StockAlertDto[]>([]);

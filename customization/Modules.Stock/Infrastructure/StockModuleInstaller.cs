@@ -33,5 +33,7 @@ public class StockModuleInstaller : IModuleInstaller
         // Register Domain Services
         services.AddScoped<Modules.Stock.Domain.Services.IMovementNumberGenerator, Modules.Stock.Domain.Services.MovementNumberGenerator>();
         services.AddScoped<Modules.Stock.Domain.Services.IStockAlertService, Modules.Stock.Domain.Services.StockAlertService>();
+        services.AddSingleton<Modules.Stock.Controllers.IInventorySessionManager, Modules.Stock.Controllers.InventorySessionManager>();
+        services.AddSingleton<Modules.Stock.Controllers.IAlertSettingsService, Modules.Stock.Controllers.AlertSettingsService>();
     }
 }

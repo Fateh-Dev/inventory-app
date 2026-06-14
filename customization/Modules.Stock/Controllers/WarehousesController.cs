@@ -79,4 +79,12 @@ public class WarehousesController : ControllerBase
         if (!result.IsSuccess) return NotFound(result.Error);
         return Ok(result.Value);
     }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var result = await _mediator.Send(new DeactivateWarehouseCommand(id));
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return NoContent();
+    }
 }
