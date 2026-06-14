@@ -1,26 +1,12 @@
 import { Component, OnInit, inject, signal, HostListener } from '@angular/core';
-import { CommonModule, DatePipe } from '@angular/common';
+import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StockService } from '../../../../services/stock.service';
 import { AuthService } from '../../../../services/auth.service';
 import { PrintService } from '../../../../services/print.service';
 import { ExportService } from '../../../../services/export.service';
 import { StockMovementDto, SupplierDto, WarehouseDto, DepartmentDto, StockItemDto, StockLotDto } from '../../models/stock.models';
-
-const TYPE_FR: Record<string, string> = {
-  Reception: 'Réception', Issue: 'Sortie', Transfer: 'Transfert',
-  Return: 'Retour', Adjustment: 'Ajustement', Disposal: 'Mise au rebut'
-};
-
-const STATUS_FR: Record<string, string> = {
-  Pending: 'En attente', Confirmed: 'Confirmé', Cancelled: 'Annulé'
-};
- 
-const UNIT_FR: Record<string, string> = {
-  Piece: 'Pièce', Liter: 'Litre', Kilogram: 'Kilogramme', Meter: 'Mètre',
-  SquareMeter: 'Mètre carré', CubicMeter: 'Mètre cube', Box: 'Carton',
-  Pallet: 'Palette', Roll: 'Rouleau', Bag: 'Sac', Can: 'Bidon', Set: 'Ensemble'
-};
+import { TranslationService } from '../../../../services/translation.service';
 
 @Component({ 
   selector: 'app-movements',
@@ -31,17 +17,17 @@ const UNIT_FR: Record<string, string> = {
       <div class="page-header">
         <div>
           <h1 class="page-title" style="display:flex;align-items:center;gap:8px;">
-            Mouvements de stock
-            <i class="pi pi-info-circle" style="font-size:16px;color:var(--text-muted);cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'" (click)="showInfoModal.set(true)" title="À propos de cette page"></i>
+            {{ t.t('mvt_title') }}
+            <i class="pi pi-info-circle" style="font-size:16px;color:var(--text-muted);cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'" (click)="showInfoModal.set(true)" [title]="t.t('mvt_info_title')"></i>
           </h1>
-          <p class="page-subtitle">Suivez toutes les réceptions, sorties, transferts et ajustements de matériaux</p>
+          <p class="page-subtitle">{{ t.t('mvt_subtitle') }}</p>
         </div>
         <div style="display:flex;gap:8px;">
           <button class="btn btn-secondary" (click)="exportCsv()">
-            <i class="pi pi-download"></i> Exporter CSV
+            <i class="pi pi-download"></i> {{ t.t('items_btn_export') }}
           </button>
           <button class="btn btn-primary" (click)="openCreate()">
-            <i class="pi pi-plus"></i> Nouveau mouvement
+            <i class="pi pi-plus"></i> {{ t.t('mvt_btn_new') }}
           </button>
         </div>
       </div>
@@ -50,25 +36,25 @@ const UNIT_FR: Record<string, string> = {
       <div class="filter-bar">
         <div class="search-box" style="max-width:200px;">
           <i class="pi pi-search"></i>
-          <input class="search-input" [(ngModel)]="search" placeholder="N° mouvement…" (ngModelChange)="onSearchChange()">
+          <input class="search-input" [(ngModel)]="search" [placeholder]="t.t('mvt_filter_num_placeholder')" (ngModelChange)="onSearchChange()">
         </div>
         <select class="form-select" style="width:170px" [(ngModel)]="filterType" (change)="onFilterChange()">
-          <option value="">Tous les types</option>
-          <option value="Reception">Réception</option>
-          <option value="Issue">Sortie</option>
-          <option value="Transfer">Transfert</option>
-          <option value="Return">Retour</option>
-          <option value="Adjustment">Ajustement</option>
-          <option value="Disposal">Mise au rebut</option>
+          <option value="">{{ t.t('mvt_filter_type') }}</option>
+          <option value="Reception">{{ t.t('mvt_type_reception') }}</option>
+          <option value="Issue">{{ t.t('mvt_type_issue') }}</option>
+          <option value="Transfer">{{ t.t('mvt_type_transfer') }}</option>
+          <option value="Return">{{ t.t('mvt_type_return') }}</option>
+          <option value="Adjustment">{{ t.t('mvt_type_adjustment') }}</option>
+          <option value="Disposal">{{ t.t('mvt_type_disposal') }}</option>
         </select>
         <select class="form-select" style="width:160px" [(ngModel)]="filterStatus" (change)="onFilterChange()">
-          <option value="">Tous les statuts</option>
-          <option value="Pending">En attente</option>
-          <option value="Confirmed">Confirmé</option>
-          <option value="Cancelled">Annulé</option>
+          <option value="">{{ t.t('mvt_filter_status') }}</option>
+          <option value="Pending">{{ t.t('mvt_status_pending') }}</option>
+          <option value="Confirmed">{{ t.t('mvt_status_confirmed') }}</option>
+          <option value="Cancelled">{{ t.t('mvt_status_cancelled') }}</option>
         </select>
-        <input class="form-input" type="date" [(ngModel)]="fromDate" (change)="onFilterChange()" style="width:150px" title="Date de début">
-        <input class="form-input" type="date" [(ngModel)]="toDate" (change)="onFilterChange()" style="width:150px" title="Date de fin">
+        <input class="form-input" type="date" [(ngModel)]="fromDate" (change)="onFilterChange()" style="width:150px" [title]="t.t('mvt_filter_start_date')">
+        <input class="form-input" type="date" [(ngModel)]="toDate" (change)="onFilterChange()" style="width:150px" [title]="t.t('mvt_filter_end_date')">
       </div>
 
       <div class="card" style="padding:0;overflow:hidden;">
@@ -77,22 +63,22 @@ const UNIT_FR: Record<string, string> = {
         } @else if (filtered().length === 0) {
           <div class="empty-state">
             <i class="pi pi-arrow-right-arrow-left"></i>
-            <h3>Aucun mouvement trouvé</h3>
-            <p>Créez votre premier mouvement de stock pour suivre les changements d'inventaire.</p>
+            <h3>{{ t.t('mvt_empty') }}</h3>
+            <p>{{ t.t('mvt_empty_desc') }}</p>
           </div>
         } @else {
           <table class="data-table">
             <thead>
               <tr>
-                <th>Numéro</th>
-                <th>Type</th>
-                <th>Statut</th>
-                <th>Date</th>
-                <th>Origine</th>
-                <th>Destination / Département</th>
-                <th>Lignes</th>
-                <th style="text-align:right">Valeur totale</th>
-                <th style="text-align:right">Actions</th>
+                <th>{{ t.t('mvt_tbl_num') }}</th>
+                <th>{{ t.t('type') }}</th>
+                <th>{{ t.t('status') }}</th>
+                <th>{{ t.t('date') }}</th>
+                <th>{{ t.t('mvt_tbl_src') }}</th>
+                <th>{{ t.t('mvt_tbl_dest_dept') }}</th>
+                <th>{{ t.t('mvt_tbl_lines') }}</th>
+                <th style="text-align:right">{{ t.t('mvt_tbl_total_value') }}</th>
+                <th style="text-align:right">{{ t.t('actions') }}</th>
               </tr>
             </thead>
             <tbody>
@@ -104,10 +90,10 @@ const UNIT_FR: Record<string, string> = {
                     </span>
                   </td>
                   <td>
-                    <span class="badge" [ngClass]="getTypeBadge(m.type)">{{ typeFr(m.type) }}</span>
+                    <span class="badge" [ngClass]="getTypeBadge(m.type)">{{ typeLocal(m.type) }}</span>
                   </td>
                   <td>
-                    <span class="badge" [ngClass]="getStatusBadge(m.status)">{{ statusFr(m.status) }}</span>
+                    <span class="badge" [ngClass]="getStatusBadge(m.status)">{{ statusLocal(m.status) }}</span>
                   </td>
                   <td style="color:var(--text-muted);font-size:12.5px;">{{ m.movementDate | date:'dd/MM/yyyy' }}</td>
                   <td style="font-size:12.5px;">{{ m.sourceWarehouseName ?? m.supplierName ?? '—' }}</td>
@@ -122,19 +108,19 @@ const UNIT_FR: Record<string, string> = {
                   </td>
                   <td style="text-align:right; white-space:nowrap;">
                     @if (m.status === 'Pending') {
-                      <button class="btn btn-primary btn-sm" style="margin-right:4px;" (click)="confirmMovement(m)" title="Confirmer le mouvement">
+                      <button class="btn btn-primary btn-sm" style="margin-right:4px;" (click)="confirmMovement(m)" [title]="t.t('mvt_action_confirm')">
                         <i class="pi pi-check"></i>
                       </button>
-                      <button class="btn btn-secondary btn-sm" style="margin-right:4px;" (click)="editMovement(m)" title="Modifier">
+                      <button class="btn btn-secondary btn-sm" style="margin-right:4px;" (click)="editMovement(m)" [title]="t.t('edit')">
                         <i class="pi pi-pencil"></i>
                       </button>
                     }
                     @if (m.status === 'Confirmed') {
-                      <button class="btn btn-secondary btn-sm" style="margin-right:4px;" (click)="printMovement(m)" title="Imprimer le bon">
+                      <button class="btn btn-secondary btn-sm" style="margin-right:4px;" (click)="printMovement(m)" [title]="t.t('mvt_action_print')">
                         <i class="pi pi-print"></i>
                       </button>
                     }
-                    <button class="btn btn-secondary btn-sm" (click)="viewDetail(m)" title="Voir le détail">
+                    <button class="btn btn-secondary btn-sm" (click)="viewDetail(m)" [title]="t.t('mvt_action_view')">
                       <i class="pi pi-eye"></i>
                     </button>
                   </td>
@@ -143,13 +129,13 @@ const UNIT_FR: Record<string, string> = {
             </tbody>
           </table>
           <div style="display:flex; justify-content:space-between; align-items:center; padding:12px 16px; border-top:1px solid var(--border); background:var(--bg-base);">
-            <span style="font-size:13px; color:var(--text-muted);">Page {{ pageNumber() }}</span>
+            <span style="font-size:13px; color:var(--text-muted);">{{ t.t('page') }} {{ pageNumber() }}</span>
             <div style="display:flex; gap:8px;">
               <button class="btn btn-secondary btn-sm" [disabled]="pageNumber() <= 1" (click)="prevPage()">
-                <i class="pi pi-chevron-left"></i> Précédent
+                <i class="pi pi-chevron-left"></i> {{ t.t('previous') }}
               </button>
               <button class="btn btn-secondary btn-sm" [disabled]="!hasMore()" (click)="nextPage()">
-                Suivant <i class="pi pi-chevron-right"></i>
+                {{ t.t('next') }} <i class="pi pi-chevron-right"></i>
               </button>
             </div>
           </div>
@@ -164,14 +150,14 @@ const UNIT_FR: Record<string, string> = {
               <div>
                 <h2 class="modal-title">{{ selectedMovement()!.movementNumber }}</h2>
                 <div style="font-size:12px;color:var(--text-muted);margin-top:2px;">
-                  {{ typeFr(selectedMovement()!.type) }} · {{ selectedMovement()!.movementDate | date:'dd MMM yyyy' }} · {{ selectedMovement()!.createdByUser }}
+                  {{ typeLocal(selectedMovement()!.type) }} · {{ selectedMovement()!.movementDate | date:'dd/MM/yyyy' }} · {{ selectedMovement()!.createdByUser }}
                 </div>
               </div>
               <div style="display:flex;gap:8px;align-items:center;">
-                <span class="badge" [ngClass]="getStatusBadge(selectedMovement()!.status)">{{ statusFr(selectedMovement()!.status) }}</span>
+                <span class="badge" [ngClass]="getStatusBadge(selectedMovement()!.status)">{{ statusLocal(selectedMovement()!.status) }}</span>
                 @if (selectedMovement()!.status === 'Confirmed') {
-                  <button class="btn btn-secondary btn-sm" (click)="printMovement(selectedMovement()!)" title="Imprimer le bon">
-                    <i class="pi pi-print"></i> Imprimer
+                  <button class="btn btn-secondary btn-sm" (click)="printMovement(selectedMovement()!)" [title]="t.t('mvt_action_print')">
+                    <i class="pi pi-print"></i> {{ t.t('history_btn_print') }}
                   </button>
                 }
                 <button class="modal-close" (click)="selectedMovement.set(null)"><i class="pi pi-times"></i></button>
@@ -182,25 +168,25 @@ const UNIT_FR: Record<string, string> = {
               <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:20px;">
                 @if (selectedMovement()!.sourceWarehouseName) {
                   <div style="background:var(--bg-base);padding:12px;border-radius:8px;border:1px solid var(--border);">
-                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">ORIGINE</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">{{ t.t('mvt_lbl_src_title') }}</div>
                     <div style="font-size:13px;font-weight:600;">{{ selectedMovement()!.sourceWarehouseName }}</div>
                   </div>
                 }
                 @if (selectedMovement()!.destinationWarehouseName || selectedMovement()!.departmentName) {
                   <div style="background:var(--bg-base);padding:12px;border-radius:8px;border:1px solid var(--border);">
-                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">DESTINATION</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">{{ t.t('mvt_lbl_dest_title') }}</div>
                     <div style="font-size:13px;font-weight:600;">{{ selectedMovement()!.destinationWarehouseName ?? selectedMovement()!.departmentName }}</div>
                   </div>
                 }
                 @if (selectedMovement()!.supplierName) {
                   <div style="background:var(--bg-base);padding:12px;border-radius:8px;border:1px solid var(--border);">
-                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">FOURNISSEUR</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">{{ t.t('mvt_lbl_supplier_title') }}</div>
                     <div style="font-size:13px;font-weight:600;">{{ selectedMovement()!.supplierName }}</div>
                   </div>
                 }
                 @if (selectedMovement()!.type === 'Reception') {
                   <div style="background:var(--bg-base);padding:12px;border-radius:8px;border:1px solid var(--border);">
-                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">VALEUR TOTALE</div>
+                    <div style="font-size:11px;color:var(--text-muted);margin-bottom:3px;">{{ t.t('mvt_lbl_val_title') }}</div>
                     <div style="font-size:16px;font-weight:800;color:var(--success);">{{ selectedMovement()!.totalValue | number:'1.2-2' }} DZD</div>
                   </div>
                 }
@@ -211,12 +197,12 @@ const UNIT_FR: Record<string, string> = {
                 <table class="data-table">
                   <thead>
                     <tr>
-                      <th>Article</th>
-                      <th>Lot</th>
-                      <th>Quantité</th>
+                      <th>{{ t.t('mvt_lines_article') }}</th>
+                      <th>{{ t.t('mvt_tbl_lot') }}</th>
+                      <th>{{ t.t('quantity') }}</th>
                       @if (selectedMovement()!.type === 'Reception') {
-                        <th>Coût unitaire</th>
-                        <th style="text-align:right">Total ligne</th>
+                        <th>{{ t.t('mvt_lines_cost') }}</th>
+                        <th style="text-align:right">{{ t.t('mvt_detail_line_total') }}</th>
                       }
                     </tr>
                   </thead>
@@ -228,7 +214,7 @@ const UNIT_FR: Record<string, string> = {
                           <div style="font-size:11px;color:var(--accent);font-family:monospace;">{{ line.stockItemReference }}</div>
                         </td>
                         <td style="font-family:monospace;font-size:12px;color:var(--text-muted);">{{ line.lotNumber }}</td>
-                        <td style="font-weight:700;">{{ line.quantity }} {{ line.unit }}</td>
+                        <td style="font-weight:700;">{{ line.quantity }} {{ unitLocal(line.unit) }}</td>
                         @if (selectedMovement()!.type === 'Reception') {
                           <td style="color:var(--text-muted);">{{ line.unitCost }} {{ line.currency }}</td>
                           <td style="text-align:right;font-weight:700;color:var(--success);">{{ line.lineTotal | number:'1.2-2' }}</td>
@@ -238,18 +224,18 @@ const UNIT_FR: Record<string, string> = {
                   </tbody>
                 </table>
               } @else {
-                <p style="color:var(--text-muted);text-align:center;padding:20px;">Aucune ligne chargée</p>
+                <p style="color:var(--text-muted);text-align:center;padding:20px;">{{ t.t('mvt_lines_empty') }}</p>
               }
 
               @if (selectedMovement()!.notes) {
                 <div style="margin-top:16px;padding:12px;background:var(--bg-base);border-radius:8px;border:1px solid var(--border);">
-                  <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">REMARQUES</div>
+                  <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">{{ t.t('mvt_modal_notes') }}</div>
                   <div style="font-size:13px;color:var(--text-primary);">{{ selectedMovement()!.notes }}</div>
                 </div>
               }
             </div>
             <div class="modal-footer">
-              <button class="btn btn-secondary" (click)="selectedMovement.set(null)">Fermer</button>
+              <button class="btn btn-secondary" (click)="selectedMovement.set(null)">{{ t.t('close') }}</button>
             </div>
           </div>
         </div>
@@ -260,78 +246,78 @@ const UNIT_FR: Record<string, string> = {
         <div class="modal-overlay">
           <div class="modal-panel" style="max-width:850px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">{{ editingId() ? 'Modifier le mouvement' : 'Nouveau mouvement de stock' }}</h2>
+              <h2 class="modal-title">{{ editingId() ? t.t('mvt_modal_edit') : t.t('mvt_modal_create') }}</h2>
               <button class="modal-close" (click)="showCreateModal.set(false)"><i class="pi pi-times"></i></button>
             </div>
             <div class="modal-body">
               <div class="form-grid">
                 <div class="form-group">
-                  <label class="form-label">Type de mouvement *</label>
+                  <label class="form-label">{{ t.t('mvt_modal_type') }}</label>
                   <select class="form-select" [(ngModel)]="createForm.type">
-                    <option value="Reception">Réception</option>
-                    <option value="Issue">Sortie</option>
-                    <option value="Transfer">Transfert</option>
-                    <option value="Return">Retour</option>
-                    <option value="Adjustment">Ajustement</option>
-                    <option value="Disposal">Mise au rebut</option>
+                    <option value="Reception">{{ t.t('mvt_type_reception') }}</option>
+                    <option value="Issue">{{ t.t('mvt_type_issue') }}</option>
+                    <option value="Transfer">{{ t.t('mvt_type_transfer') }}</option>
+                    <option value="Return">{{ t.t('mvt_type_return') }}</option>
+                    <option value="Adjustment">{{ t.t('mvt_type_adjustment') }}</option>
+                    <option value="Disposal">{{ t.t('mvt_type_disposal') }}</option>
                   </select>
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Date du mouvement *</label>
+                  <label class="form-label">{{ t.t('mvt_modal_date') }}</label>
                   <input class="form-input" type="date" [(ngModel)]="createForm.movementDate">
                 </div>
               </div>
               <div class="form-grid">
                 @if (createForm.type === 'Reception') {
                   <div class="form-group">
-                    <label class="form-label">Entrepôt de destination *</label>
+                    <label class="form-label">{{ t.t('mvt_modal_dest_wh') }}</label>
                     <select class="form-select" [(ngModel)]="createForm.destinationWarehouseId">
-                      <option value="">Sélectionner...</option>
+                      <option value="">{{ t.t('select_placeholder') }}</option>
                       @for (wh of warehouses(); track wh.id) { <option [value]="wh.id">{{ wh.name }}</option> }
                     </select>
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Fournisseur *</label>
+                    <label class="form-label">{{ t.t('mvt_modal_supplier') }}</label>
                     <select class="form-select" [(ngModel)]="createForm.supplierId">
-                      <option value="">Sélectionner...</option>
+                      <option value="">{{ t.t('select_placeholder') }}</option>
                       @for (sup of suppliers(); track sup.id) { <option [value]="sup.id">{{ sup.name }}</option> }
                     </select>
                   </div>
                 } @else if (createForm.type === 'Issue' || createForm.type === 'Disposal') {
                   <div class="form-group">
-                    <label class="form-label">Entrepôt source *</label>
+                    <label class="form-label">{{ t.t('mvt_modal_src_wh') }}</label>
                     <select class="form-select" [(ngModel)]="createForm.sourceWarehouseId" (change)="resetNewLine()">
-                      <option value="">Sélectionner...</option>
+                      <option value="">{{ t.t('select_placeholder') }}</option>
                       @for (wh of warehouses(); track wh.id) { <option [value]="wh.id">{{ wh.name }}</option> }
                     </select>
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Département (Destination) *</label>
+                    <label class="form-label">{{ t.t('mvt_modal_dept') }}</label>
                     <select class="form-select" [(ngModel)]="createForm.departmentId">
-                      <option value="">Sélectionner...</option>
+                      <option value="">{{ t.t('select_placeholder') }}</option>
                       @for (dep of departments(); track dep.id) { <option [value]="dep.id">{{ dep.name }}</option> }
                     </select>
                   </div>
                 } @else if (createForm.type === 'Transfer') {
                   <div class="form-group">
-                    <label class="form-label">Entrepôt source *</label>
+                    <label class="form-label">{{ t.t('mvt_modal_src_wh') }}</label>
                     <select class="form-select" [(ngModel)]="createForm.sourceWarehouseId" (change)="resetNewLine()">
-                      <option value="">Sélectionner...</option>
+                      <option value="">{{ t.t('select_placeholder') }}</option>
                       @for (wh of warehouses(); track wh.id) { <option [value]="wh.id">{{ wh.name }}</option> }
                     </select>
                   </div>
                   <div class="form-group">
-                    <label class="form-label">Entrepôt de destination *</label>
+                    <label class="form-label">{{ t.t('mvt_modal_dest_wh') }}</label>
                     <select class="form-select" [(ngModel)]="createForm.destinationWarehouseId">
-                      <option value="">Sélectionner...</option>
+                      <option value="">{{ t.t('select_placeholder') }}</option>
                       @for (wh of warehouses(); track wh.id) { <option [value]="wh.id">{{ wh.name }}</option> }
                     </select>
                   </div>
                 } @else {
                   <div class="form-group">
-                    <label class="form-label">Entrepôt *</label>
+                    <label class="form-label">{{ t.t('mvt_modal_wh_general') }}</label>
                     <select class="form-select" [(ngModel)]="createForm.sourceWarehouseId" (change)="resetNewLine()">
-                      <option value="">Sélectionner...</option>
+                      <option value="">{{ t.t('select_placeholder') }}</option>
                       @for (wh of warehouses(); track wh.id) { <option [value]="wh.id">{{ wh.name }}</option> }
                     </select>
                   </div>
@@ -339,29 +325,29 @@ const UNIT_FR: Record<string, string> = {
               </div>
               <div class="form-grid">
                 <div class="form-group">
-                  <label class="form-label">Référence externe</label>
-                  <input class="form-input" [(ngModel)]="createForm.reference" placeholder="N° bon de commande, etc.">
+                  <label class="form-label">{{ t.t('mvt_modal_ref_ext') }}</label>
+                  <input class="form-input" [(ngModel)]="createForm.reference" [placeholder]="t.t('mvt_placeholder_ref_ext')">
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Créé par *</label>
+                  <label class="form-label">{{ t.t('mvt_modal_operator') }}</label>
                   <input type="text" class="form-input" [(ngModel)]="createForm.createdByUser" readonly style="background-color: var(--bg-hover); color: var(--text-muted); cursor: not-allowed;">
                 </div>
               </div>
               <div class="form-group">
-                <label class="form-label">Remarques</label>
-                <textarea class="form-textarea" [(ngModel)]="createForm.notes" placeholder="Notes optionnelles"></textarea>
+                <label class="form-label">{{ t.t('mvt_modal_notes') }}</label>
+                <textarea class="form-textarea" [(ngModel)]="createForm.notes" [placeholder]="t.t('mvt_placeholder_notes')"></textarea>
               </div>
 
               <!-- LIGNES -->
-              <h3 style="margin-top:20px;margin-bottom:12px;font-size:15px;border-bottom:1px solid var(--border);padding-bottom:8px;">Lignes de mouvement</h3>
+              <h3 style="margin-top:20px;margin-bottom:12px;font-size:15px;border-bottom:1px solid var(--border);padding-bottom:8px;">{{ t.t('mvt_lines_title') }}</h3>
               
               @if (createForm.lines?.length > 0) {
                 <table class="data-table" style="margin-bottom:12px; font-size: 13px;">
                   <thead>
                     <tr>
-                      <th>Article</th>
-                      <th>Détail</th>
-                      <th>Qté</th>
+                      <th>{{ t.t('mvt_lines_article') }}</th>
+                      <th>{{ t.t('mvt_detail_lbl') }}</th>
+                      <th>{{ t.t('quantity') }}</th>
                       <th></th>
                     </tr>
                   </thead>
@@ -376,7 +362,7 @@ const UNIT_FR: Record<string, string> = {
                             <span style="font-family:monospace;font-size:11px;color:var(--accent);">{{ l._lotNumber ?? l.stockLotId }}</span>
                           }
                         </td>
-                        <td style="font-weight:600">{{ l.quantity }} {{ l.unit }}</td>
+                        <td style="font-weight:600">{{ l.quantity }} {{ unitLocal(l.unit) }}</td>
                         <td style="text-align:right">
                           <button class="btn btn-danger btn-sm" (click)="removeLine($index)"><i class="pi pi-trash"></i></button>
                         </td>
@@ -390,11 +376,11 @@ const UNIT_FR: Record<string, string> = {
                 <!-- ROW 1: Article and Coût unitaire in same row (if Reception) -->
                 <div style="display:flex; gap:16px; margin-bottom:16px; align-items:flex-start;">
                   <div class="form-group autocomplete-container" style="position:relative; flex:1; margin:0;">
-                    <label class="form-label">Article *</label>
+                    <label class="form-label">{{ t.t('mvt_lines_article') }}</label>
                     <input class="form-input" 
                            [(ngModel)]="itemSearchQuery" 
                            (ngModelChange)="searchArticles($event)" 
-                           placeholder="Rechercher par nom ou référence…" 
+                           [placeholder]="t.t('items_search_placeholder')" 
                            (focus)="showSuggestions.set(true)">
                     
                     @if (showSuggestions() && suggestions().length > 0) {
@@ -403,18 +389,18 @@ const UNIT_FR: Record<string, string> = {
                           <div class="suggestion-item" 
                                style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition:background 0.2s;"
                                (click)="selectArticle(item)">
-                            <div style="font-weight:600; font-size:13px; color:var(--text-primary);">{{ item.name }}</div>
-                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-top:2px;">
-                              <span style="color:var(--accent); font-family:monospace;">{{ item.reference }}</span>
-                              <span style="color:var(--text-muted); font-size:11px;">Dispo: <strong style="color:var(--text-primary)">{{ item.totalQuantity }}</strong> {{ unitFr(item.defaultUnit) }}</span>
-                            </div>
+                             <div style="font-weight:600; font-size:13px; color:var(--text-primary);">{{ item.name }}</div>
+                             <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-top:2px;">
+                               <span style="color:var(--accent); font-family:monospace;">{{ item.reference }}</span>
+                               <span style="color:var(--text-muted); font-size:11px;">{{ t.t('mvt_avail_prefix') }} <strong style="color:var(--text-primary)">{{ item.totalQuantity }}</strong> {{ unitLocal(item.defaultUnit) }}</span>
+                             </div>
                           </div>
                         }
                       </div>
                     }
                     @if (showSuggestions() && suggestions().length === 0 && itemSearchQuery.trim().length >= 2 && !loadingSuggestions()) {
                       <div style="position:absolute; bottom:100%; left:0; right:0; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; padding:12px; font-size:13px; color:var(--text-muted); z-index:1000; text-align:center; box-shadow:0 -10px 15px -3px rgba(0,0,0,0.1); margin-bottom:4px;">
-                        Aucun article trouvé
+                        {{ t.t('items_empty') }}
                       </div>
                     }
                     @if (loadingSuggestions()) {
@@ -426,7 +412,7 @@ const UNIT_FR: Record<string, string> = {
 
                   @if (createForm.type === 'Reception') {
                     <div class="form-group" style="width:160px; min-width:160px; margin:0;">
-                      <label class="form-label">Coût unitaire (DZD) *</label>
+                      <label class="form-label">{{ t.t('mvt_lines_cost') }}</label>
                       <input type="number" class="form-input" [(ngModel)]="newLine.unitCost" min="0">
                     </div>
                   }
@@ -435,12 +421,12 @@ const UNIT_FR: Record<string, string> = {
                 <!-- ROW 2: Lot details or Expiry/Serial details -->
                 @if (createForm.type !== 'Reception') {
                   <div class="form-group" style="margin-bottom:16px;">
-                    <label class="form-label">Lot source *</label>
+                    <label class="form-label">{{ t.t('mvt_lines_lot') }}</label>
                     <select class="form-select" [(ngModel)]="newLine.stockLotId">
-                      <option value="">Sélectionner...</option>
+                      <option value="">{{ t.t('select_placeholder') }}</option>
                       @for (lot of availableLots(); track lot.id) {
                         <option [value]="lot.id" [disabled]="createForm.sourceWarehouseId && lot.warehouseId !== createForm.sourceWarehouseId">
-                          {{ lot.lotNumber }} (Dispo: {{ lot.currentQuantity }}) - {{ lot.warehouseName }}
+                          {{ lot.lotNumber }} ({{ t.t('mvt_avail_prefix') }} {{ lot.currentQuantity }}) - {{ lot.warehouseName }}
                         </option>
                       }
                     </select>
@@ -449,13 +435,13 @@ const UNIT_FR: Record<string, string> = {
                   <div class="form-grid" style="margin-bottom:16px;">
                     @if (getSelectedItem()?.hasExpiryDate) {
                       <div class="form-group" style="margin:0;">
-                        <label class="form-label">Date d'expiration *</label>
+                        <label class="form-label">{{ t.t('mvt_lines_expiry') }}</label>
                         <input type="date" class="form-input" [(ngModel)]="newLine.expiryDate">
                       </div>
                     }
                     @if (getSelectedItem()?.requiresSerialNumber) {
                       <div class="form-group" style="margin:0;">
-                        <label class="form-label">Numéro de série *</label>
+                        <label class="form-label">{{ t.t('mvt_lines_serial') }}</label>
                         <input type="text" class="form-input" [(ngModel)]="newLine.serialNumber" placeholder="N° Série">
                       </div>
                     }
@@ -465,37 +451,28 @@ const UNIT_FR: Record<string, string> = {
                 <!-- ROW 3: Quantity and Unit (with add button) -->
                 <div style="display:flex;gap:12px;align-items:flex-end;">
                   <div class="form-group" style="flex:1;margin:0;">
-                    <label class="form-label">{{ createForm.type === 'Adjustment' ? 'Nouvelle Qté (Absolue) *' : 'Quantité *' }}</label>
+                    <label class="form-label">{{ createForm.type === 'Adjustment' ? t.t('mvt_lines_qty_absolute') : t.t('mvt_lines_qty') }}</label>
                     <input type="number" class="form-input" [(ngModel)]="newLine.quantity" min="0.01" step="0.01">
                   </div>
                   <div class="form-group" style="flex:1;margin:0;">
-                    <label class="form-label">Unité</label>
+                    <label class="form-label">{{ t.t('mvt_lines_unit') }}</label>
                     <select class="form-select" [(ngModel)]="newLine.unit">
-                      <option value="Piece">Pièce</option>
-                      <option value="Liter">Litre</option>
-                      <option value="Kilogram">Kilogramme</option>
-                      <option value="Meter">Mètre</option>
-                      <option value="SquareMeter">M²</option>
-                      <option value="CubicMeter">M³</option>
-                      <option value="Box">Boîte</option>
-                      <option value="Pallet">Palette</option>
-                      <option value="Roll">Rouleau</option>
-                      <option value="Bag">Sac</option>
-                      <option value="Can">Bidon</option>
-                      <option value="Set">Kit/Set</option>
+                      @for (u of units; track u) {
+                        <option [value]="u">{{ unitLocal(u) }}</option>
+                      }
                     </select>
                   </div>
                   <button class="btn btn-secondary" (click)="addLine()" [disabled]="!canAddLine()">
-                    <i class="pi pi-plus"></i> Ajouter
+                    <i class="pi pi-plus"></i> {{ t.t('add') }}
                   </button>
                 </div>
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn btn-secondary" (click)="showCreateModal.set(false)">Annuler</button>
+              <button class="btn btn-secondary" (click)="showCreateModal.set(false)">{{ t.t('cancel') }}</button>
               <button class="btn btn-primary" (click)="saveMovement()" [disabled]="saving()">
                 @if (saving()) { <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> }
-                {{ editingId() ? 'Enregistrer les modifications' : 'Créer le mouvement' }}
+                {{ editingId() ? t.t('mvt_btn_submit_save') : t.t('mvt_btn_submit') }}
               </button>
             </div>
           </div>
@@ -509,25 +486,25 @@ const UNIT_FR: Record<string, string> = {
             <div class="modal-header">
               <h2 class="modal-title" style="display:flex;align-items:center;gap:8px;">
                 <i class="pi pi-info-circle" style="color:var(--accent)"></i>
-                Mouvements de Stock
+                {{ t.t('mvt_info_title') }}
               </h2>
               <button class="modal-close" (click)="showInfoModal.set(false)"><i class="pi pi-times"></i></button>
             </div>
             <div class="modal-body" style="font-size:14px;line-height:1.6;color:var(--text-primary);">
-              <p style="margin-bottom:16px;"><strong>Description :</strong><br>
-                Ce module gère le flux opérationnel des marchandises à travers les réceptions, distributions/sorties, transferts d'entrepôts, retours de matériel, ou ajustements.
+              <p style="margin-bottom:16px;"><strong>{{ t.t('items_modal_desc') }} :</strong><br>
+                {{ t.t('mvt_info_desc') }}
               </p>
-              <p style="margin-bottom:8px;"><strong>Fonctionnalités clés :</strong></p>
+              <p style="margin-bottom:8px;"><strong>{{ t.t('mvt_info_features_title') }}</strong></p>
               <ul style="padding-left:20px;margin-bottom:16px;display:flex;flex-direction:column;gap:6px;">
-                <li>📥 <strong>Réception & Saisie financière</strong> : Saisissez les livraisons de fournisseurs avec coûts unitaires (valeur totale calculée automatiquement).</li>
-                <li>📤 <strong>Flux internes (Sorties/Transferts)</strong> : Effectuez des sorties vers des départements internes ou transférez vers d'autres dépôts (sans information de coût requise).</li>
-                <li>📝 <strong>Mode Brouillon (En attente)</strong> : Créez des mouvements temporaires que vous pouvez modifier librement sans impacter les stocks réels.</li>
-                <li>🔒 <strong>Validation (Confirmation)</strong> : Confirmez définitivement un mouvement pour appliquer les modifications physiques de stocks et générer les lots.</li>
-                <li>🖨️ <strong>Documents PDF/Impression</strong> : Imprimez des bons de livraison/sortie professionnels signés.</li>
+                <li>{{ t.t('mvt_info_f1_title') }} : {{ t.t('mvt_info_f1_text') }}</li>
+                <li>{{ t.t('mvt_info_f2_title') }} : {{ t.t('mvt_info_f2_text') }}</li>
+                <li>{{ t.t('mvt_info_f3_title') }} : {{ t.t('mvt_info_f3_text') }}</li>
+                <li>{{ t.t('mvt_info_f4_title') }} : {{ t.t('mvt_info_f4_text') }}</li>
+                <li>{{ t.t('mvt_info_f5_title') }} : {{ t.t('mvt_info_f5_text') }}</li>
               </ul>
             </div>
             <div class="modal-footer">
-              <button class="btn btn-secondary" (click)="showInfoModal.set(false)">Fermer</button>
+              <button class="btn btn-secondary" (click)="showInfoModal.set(false)">{{ t.t('close') }}</button>
             </div>
           </div>
         </div>
@@ -552,7 +529,7 @@ const UNIT_FR: Record<string, string> = {
               }
             </div>
             <div class="modal-footer" style="justify-content: center; margin-top: 24px;">
-              <button class="btn btn-primary" (click)="closeCustomAlert()">D'accord</button>
+              <button class="btn btn-primary" (click)="closeCustomAlert()">{{ t.t('ok') }}</button>
             </div>
           </div>
         </div>
@@ -570,8 +547,8 @@ const UNIT_FR: Record<string, string> = {
               {{ customConfirm()?.message }}
             </p>
             <div class="modal-footer" style="justify-content: center; margin-top: 24px; gap: 12px;">
-              <button class="btn btn-secondary" (click)="closeCustomConfirm(false)">Annuler</button>
-              <button class="btn btn-primary" (click)="closeCustomConfirm(true)">Confirmer</button>
+              <button class="btn btn-secondary" (click)="closeCustomConfirm(false)">{{ t.t('cancel') }}</button>
+              <button class="btn btn-primary" (click)="closeCustomConfirm(true)">{{ t.t('confirm') }}</button>
             </div>
           </div>
         </div>
@@ -584,8 +561,10 @@ export class MovementsComponent implements OnInit {
   private authService = inject(AuthService);
   private printService = inject(PrintService);
   private exportService = inject(ExportService);
+  public t = inject(TranslationService);
   
   currentUser = this.authService.currentUser;
+  units = ['Piece','Liter','Kilogram','Meter','SquareMeter','CubicMeter','Box','Pallet','Roll','Bag','Can','Set'];
 
   showInfoModal = signal(false);
   customAlert = signal<{ title: string; message: string; severity?: 'error' | 'warning' | 'success'; list?: string[] } | null>(null);
@@ -618,42 +597,42 @@ export class MovementsComponent implements OnInit {
 
     if (this.createForm.type === 'Reception') {
       if (!this.createForm.destinationWarehouseId) {
-        missing.push("Entrepôt de destination");
+        missing.push(this.t.t('mvt_modal_dest_wh').replace(' *', ''));
       }
       if (!this.createForm.supplierId) {
-        missing.push("Fournisseur");
+        missing.push(this.t.t('mvt_modal_supplier').replace(' *', ''));
       }
     } else if (this.createForm.type === 'Issue' || this.createForm.type === 'Disposal') {
       if (!this.createForm.sourceWarehouseId) {
-        missing.push("Entrepôt source");
+        missing.push(this.t.t('mvt_modal_src_wh').replace(' *', ''));
       }
       if (!this.createForm.departmentId) {
-        missing.push("Département (Destination)");
+        missing.push(this.t.t('mvt_modal_dept').replace(' *', ''));
       }
     } else if (this.createForm.type === 'Transfer') {
       if (!this.createForm.sourceWarehouseId) {
-        missing.push("Entrepôt source");
+        missing.push(this.t.t('mvt_modal_src_wh').replace(' *', ''));
       }
       if (!this.createForm.destinationWarehouseId) {
-        missing.push("Entrepôt de destination");
+        missing.push(this.t.t('mvt_modal_dest_wh').replace(' *', ''));
       }
       if (this.createForm.sourceWarehouseId && this.createForm.destinationWarehouseId && this.createForm.sourceWarehouseId === this.createForm.destinationWarehouseId) {
-        missing.push("L'entrepôt de destination doit être différent de l'entrepôt source");
+        missing.push(this.t.currentLang() === 'ar' ? "يجب أن يكون مستودع الوجهة مختلفًا عن مستودع المصدر" : (this.t.currentLang() === 'en' ? "Destination warehouse must be different from source warehouse" : "L'entrepôt de destination doit être différent de l'entrepôt source"));
       }
     } else {
       if (!this.createForm.sourceWarehouseId) {
-        missing.push("Entrepôt");
+        missing.push(this.t.t('mvt_modal_wh_general').replace(' *', ''));
       }
     }
 
     if (!this.createForm.lines || this.createForm.lines.length === 0) {
-      missing.push("Au moins une ligne de mouvement");
+      missing.push(this.t.t('mvt_lines_empty'));
     }
 
     if (missing.length > 0) {
       this.customAlert.set({
-        title: "Formulaire incomplet",
-        message: "Veuillez remplir tous les champs obligatoires suivants :",
+        title: this.t.t('validation_title'),
+        message: this.t.t('validation_desc'),
         severity: "warning",
         list: missing
       });
@@ -728,7 +707,6 @@ export class MovementsComponent implements OnInit {
     this.stockService.getSuppliers(true).subscribe(data => this.suppliers.set(data));
     this.stockService.getWarehouses(true).subscribe(data => this.warehouses.set(data));
     this.stockService.getDepartments(true).subscribe(data => this.departments.set(data));
-    // No longer load all 100k items on startup to make loading instantaneous!
   }
 
   applyFilter() {
@@ -796,12 +774,6 @@ export class MovementsComponent implements OnInit {
             serialNumber: l.serialNumber || ''
           }))
         };
-        // Fetch item names for lines
-        full.lines.forEach((l: any) => {
-          if (!this.itemNamesMap.has(l.stockItemId)) {
-            // we don't have the name, ideally we'd fetch it, but it should be ok if we don't display perfectly while editing, or we can use stockItems().find
-          }
-        });
         this.resetNewLine();
         this.showCreateModal.set(true);
       }
@@ -810,8 +782,8 @@ export class MovementsComponent implements OnInit {
 
   confirmMovement(m: StockMovementDto) {
     this.showConfirm(
-      `Confirmer le mouvement ${m.movementNumber}`,
-      `Voulez-vous vraiment confirmer le mouvement ${m.movementNumber} ? Cette action mettra à jour les stocks et est irréversible.`,
+      this.t.t('mvt_confirm_title'),
+      this.t.t('mvt_confirm_message').replace('{number}', m.movementNumber),
       () => {
         this.loading.set(true);
         this.stockService.confirmMovement(m.id).subscribe({
@@ -830,10 +802,8 @@ export class MovementsComponent implements OnInit {
   }
 
   onItemSelect() {
-    // Managed in autocomplete selection
   }
 
-  // Autocomplete support methods
   searchArticles(queryStr: string) {
     if (!queryStr || queryStr.trim().length < 2) {
       this.suggestions.set([]);
@@ -882,7 +852,7 @@ export class MovementsComponent implements OnInit {
     if (!this.newLine.stockItemId || this.newLine.quantity <= 0) return false;
     
     if (this.createForm.type === 'Reception') {
-      if (this.newLine.unitCost <= 0) return false; // Bug #9: unitCost must be > 0
+      if (this.newLine.unitCost <= 0) return false;
       const item = this.getSelectedItem();
       if (item) {
         if (item.hasExpiryDate && !this.newLine.expiryDate) return false;
@@ -901,7 +871,6 @@ export class MovementsComponent implements OnInit {
 
   addLine() {
     if (!this.canAddLine()) return;
-    // Bug #4: Store lot number for display in the line summary table
     const lot = this.availableLots().find(l => l.id === this.newLine.stockLotId);
     this.createForm.lines.push({ ...this.newLine, _lotNumber: lot?.lotNumber ?? null });
     this.resetNewLine();
@@ -912,7 +881,7 @@ export class MovementsComponent implements OnInit {
   }
 
   getItemName(id: string): string {
-    return this.itemNamesMap.get(id) ?? this.stockItems().find(i => i.id === id)?.name ?? 'Inconnu';
+    return this.itemNamesMap.get(id) ?? this.stockItems().find(i => i.id === id)?.name ?? (this.t.currentLang() === 'ar' ? 'غير معروف' : (this.t.currentLang() === 'en' ? 'Unknown' : 'Inconnu'));
   }
 
   viewDetail(m: StockMovementDto) {
@@ -960,21 +929,35 @@ export class MovementsComponent implements OnInit {
 
   exportCsv() {
     const data = this.items().map(m => ({
-      'N° Mouvement': m.movementNumber,
-      'Type': this.typeFr(m.type),
-      'Statut': this.statusFr(m.status),
-      'Date': new Date(m.movementDate).toLocaleDateString('fr-FR'),
-      'Provenance': m.sourceWarehouseName || m.supplierName || '—',
-      'Destination': m.destinationWarehouseName || m.departmentName || '—',
-      'Référence': m.reference || '—',
-      'Créé par': m.createdByUser || '—'
+      [this.t.t('mvt_tbl_num')]: m.movementNumber,
+      [this.t.t('type')]: this.typeLocal(m.type),
+      [this.t.t('status')]: this.statusLocal(m.status),
+      [this.t.t('date')]: new Date(m.movementDate).toLocaleDateString(this.t.currentLang() === 'ar' ? 'ar-EG' : (this.t.currentLang() === 'en' ? 'en-US' : 'fr-FR')),
+      [this.t.t('mvt_tbl_src')]: m.sourceWarehouseName || m.supplierName || '—',
+      [this.t.t('mvt_tbl_dest')]: m.destinationWarehouseName || m.departmentName || '—',
+      [this.t.t('mvt_tbl_ref_ext')]: m.reference || '—',
+      [this.t.t('mvt_tbl_operator')]: m.createdByUser || '—'
     }));
     this.exportService.exportToCsv(data, 'mouvements_stock');
   }
 
-  typeFr(type: string): string { return TYPE_FR[type] ?? type; }
-  statusFr(status: string): string { return STATUS_FR[status] ?? status; }
-  unitFr(u: string): string { return UNIT_FR[u] ?? u; }
+  typeLocal(type: string): string {
+    if (!type) return '';
+    const key = 'mvt_type_' + type.toLowerCase();
+    return this.t.t(key);
+  }
+
+  statusLocal(status: string): string {
+    if (!status) return '';
+    const key = 'mvt_status_' + status.toLowerCase();
+    return this.t.t(key);
+  }
+
+  unitLocal(u: string): string {
+    if (!u) return '';
+    const key = 'unit_' + u.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+    return this.t.t(key);
+  }
 
   getTypeBadge(type: string): string {
     const map: Record<string, string> = {

@@ -1244,3 +1244,57 @@ html, body {
   margin-top: 8px;
 }
 
+/* ──────────────────────────────────────────────
+   RTL overrides
+────────────────────────────────────────────── */
+html[dir="rtl"] body {
+  text-align: right;
+}
+
+html[dir="rtl"] .search-box .pi,
+html[dir="rtl"] .global-search-container .pi-search {
+  left: auto !important;
+  right: 12px !important;
+}
+
+html[dir="rtl"] .search-box input,
+html[dir="rtl"] .global-search-container input {
+  padding-left: 12px !important;
+  padding-right: 32px !important;
+}
+
+html[dir="rtl"] .global-search-container .pi-times {
+  right: auto !important;
+  left: 12px !important;
+}
+
+html[dir="rtl"] .topbar {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .page-header {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .filter-bar {
+  flex-direction: row-reverse;
+}
+
+html[dir="rtl"] .sidebar-footer {
+  text-align: right;
+}
+
+html[dir="rtl"] td, html[dir="rtl"] th {
+  text-align: right !important;
+}
+
+html[dir="rtl"] th:last-child, html[dir="rtl"] td:last-child {
+  text-align: left !important;
+}
+
+html[dir="rtl"] .btn i {
+  margin-left: 6px;
+  margin-right: 0;
+}
+
+

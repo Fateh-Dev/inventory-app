@@ -37,6 +37,7 @@ public class InventoryItem
     public decimal PhysicalQuantity { get; set; }
     public decimal Gap => PhysicalQuantity - TheoreticalQuantity;
     public bool IsCounted { get; set; }
+    public DateTime? ExpiryDate { get; set; }
 }
 
 public class StartSessionRequest
@@ -157,7 +158,8 @@ public class InventoryController : ControllerBase
                 Unit = l.CurrentQuantity.Unit.ToString(),
                 TheoreticalQuantity = l.CurrentQuantity.Value,
                 PhysicalQuantity = l.CurrentQuantity.Value, // default to theoretical
-                IsCounted = false
+                IsCounted = false,
+                ExpiryDate = l.ExpiryDate
             };
         }).ToList();
 
