@@ -90,11 +90,11 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
                       </button>
                       @if (u.id !== currentUser()?.id && u.username !== 'admin') {
                         @if (u.isActive) {
-                          <button class="btn btn-danger btn-sm" (click)="toggleActive(u)" title="Désactiver">
+                          <button class="btn btn-danger btn-sm" (click)="confirmToggleActive(u)" title="Désactiver">
                             <i class="pi pi-ban"></i>
                           </button>
                         } @else {
-                          <button class="btn btn-success btn-sm" (click)="toggleActive(u)" title="Activer">
+                          <button class="btn btn-success btn-sm" (click)="confirmToggleActive(u)" title="Activer">
                             <i class="pi pi-check"></i>
                           </button>
                         }
@@ -168,6 +168,29 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
           </div>
         </div>
       }
+
+      <!-- Confirmation Dialog -->
+      @if (itemToDeactivate()) {
+        <div class="modal-overlay">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper">
+              <i class="pi pi-exclamation-triangle"></i>
+            </div>
+            <h2 class="modal-title">Désactiver l'utilisateur</h2>
+            <p class="confirm-message">
+              Êtes-vous sûr de vouloir désactiver l'utilisateur <strong>{{ itemToDeactivate()?.fullName }}</strong> ?<br>
+              Il ne pourra plus se connecter au système.
+            </p>
+            <div class="modal-footer" style="justify-content:center;margin-top:24px;">
+              <button class="btn btn-secondary" (click)="cancelDeactivate()">Annuler</button>
+              <button class="btn btn-danger" (click)="executeDeactivate()" [disabled]="saving()">
+                @if (saving()) { <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> }
+                Oui, désactiver
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
   `,
   styles: [
@@ -204,6 +227,32 @@ import { AuthService, UserDto } from '../../../../services/auth.service';
         margin-top: 2px;
         display: block;
       }
+
+      .confirm-panel {
+        max-width: 400px !important;
+        text-align: center;
+        padding: 32px 24px !important;
+      }
+
+      .confirm-icon-wrapper {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        margin: 0 auto 16px;
+      }
+
+      .confirm-message {
+        color: var(--text-muted);
+        font-size: 14.5px;
+        line-height: 1.5;
+        margin-top: 8px;
+      }
     `
   ]
 })
@@ -216,6 +265,7 @@ export class UserManagementComponent implements OnInit {
   saving = signal(false);
   showModal = signal(false);
   editItem = signal<UserDto | null>(null);
+  itemToDeactivate = signal<UserDto | null>(null);
   items = signal<UserDto[]>([]);
   filtered = signal<UserDto[]>([]);
   errorMessage = signal<string | null>(null);
@@ -284,8 +334,33 @@ export class UserManagementComponent implements OnInit {
     });
   }
 
-  toggleActive(item: UserDto) {
-    const req = item.isActive ? this.authService.deactivateUser(item.id) : this.authService.activateUser(item.id);
-    req.subscribe({ next: () => this.load() });
+  confirmToggleActive(item: UserDto) {
+    if (item.isActive) {
+      this.itemToDeactivate.set(item);
+    } else {
+      const req = this.authService.activateUser(item.id);
+      req.subscribe({ next: () => this.load() });
+    }
+  }
+
+  cancelDeactivate() {
+    this.itemToDeactivate.set(null);
+  }
+
+  executeDeactivate() {
+    const item = this.itemToDeactivate();
+    if (!item) return;
+
+    this.saving.set(true);
+    this.authService.deactivateUser(item.id).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.itemToDeactivate.set(null);
+        this.load();
+      },
+      error: () => {
+        this.saving.set(false);
+      }
+    });
   }
 }

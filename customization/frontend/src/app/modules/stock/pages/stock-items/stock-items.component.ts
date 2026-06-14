@@ -109,11 +109,11 @@ const UNIT_FR: Record<string, string> = {
                         <i class="pi pi-pencil"></i>
                       </button>
                       @if (item.isActive) {
-                        <button class="btn btn-danger btn-sm" (click)="toggleActive(item)" title="Désactiver">
+                        <button class="btn btn-danger btn-sm" (click)="confirmToggleActive(item)" title="Désactiver">
                           <i class="pi pi-ban"></i>
                         </button>
                       } @else {
-                        <button class="btn btn-success btn-sm" (click)="toggleActive(item)" title="Activer">
+                        <button class="btn btn-success btn-sm" (click)="confirmToggleActive(item)" title="Activer">
                           <i class="pi pi-check"></i>
                         </button>
                       }
@@ -280,8 +280,60 @@ const UNIT_FR: Record<string, string> = {
           </div>
         </div>
       }
+
+      <!-- Confirmation Dialog -->
+      @if (itemToDeactivate()) {
+        <div class="modal-overlay" style="z-index: 2000;">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper">
+              <i class="pi pi-exclamation-triangle"></i>
+            </div>
+            <h2 class="modal-title">Désactiver l'article</h2>
+            <p class="confirm-message">
+              Êtes-vous sûr de vouloir désactiver l'article <strong>{{ itemToDeactivate()?.name }}</strong> ?<br>
+              Il ne sera plus disponible pour les nouvelles entrées ou sorties.
+            </p>
+            <div class="modal-footer" style="justify-content:center;margin-top:24px;">
+              <button class="btn btn-secondary" (click)="cancelDeactivate()">Annuler</button>
+              <button class="btn btn-danger" (click)="executeDeactivate()" [disabled]="saving()">
+                @if (saving()) { <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> }
+                Oui, désactiver
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
-  `
+  `,
+  styles: [
+    `
+      .confirm-panel {
+        max-width: 400px !important;
+        text-align: center;
+        padding: 32px 24px !important;
+      }
+
+      .confirm-icon-wrapper {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        margin: 0 auto 16px;
+      }
+
+      .confirm-message {
+        color: var(--text-muted);
+        font-size: 14.5px;
+        line-height: 1.5;
+        margin-top: 8px;
+      }
+    `
+  ]
 })
 export class StockItemsComponent implements OnInit {
   private stockService = inject(StockService);
@@ -290,6 +342,7 @@ export class StockItemsComponent implements OnInit {
   saving = signal(false);
   showModal = signal(false);
   editItem = signal<StockItemDto | null>(null);
+  itemToDeactivate = signal<StockItemDto | null>(null);
 
   items = signal<StockItemDto[]>([]);
   suppliers = signal<SupplierDto[]>([]);
@@ -481,11 +534,34 @@ export class StockItemsComponent implements OnInit {
     });
   }
 
-  toggleActive(item: StockItemDto) {
-    const req = item.isActive
-      ? this.stockService.deactivateStockItem(item.id)
-      : this.stockService.activateStockItem(item.id);
-    req.subscribe({ next: () => this.load() });
+  confirmToggleActive(item: StockItemDto) {
+    if (item.isActive) {
+      this.itemToDeactivate.set(item);
+    } else {
+      const req = this.stockService.activateStockItem(item.id);
+      req.subscribe({ next: () => this.load() });
+    }
+  }
+
+  cancelDeactivate() {
+    this.itemToDeactivate.set(null);
+  }
+
+  executeDeactivate() {
+    const item = this.itemToDeactivate();
+    if (!item) return;
+
+    this.saving.set(true);
+    this.stockService.deactivateStockItem(item.id).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.itemToDeactivate.set(null);
+        this.load();
+      },
+      error: () => {
+        this.saving.set(false);
+      }
+    });
   }
 
   unitFr(u: string): string { return UNIT_FR[u] ?? u; }

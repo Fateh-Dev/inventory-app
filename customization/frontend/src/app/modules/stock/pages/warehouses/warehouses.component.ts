@@ -87,11 +87,11 @@ import { WarehouseDto } from '../../models/stock.models';
                   <i class="pi pi-pencil"></i> Modifier
                 </button>
                 @if (wh.isActive) {
-                  <button class="btn btn-danger btn-sm" (click)="toggleActive(wh)" title="Désactiver">
+                  <button class="btn btn-danger btn-sm" (click)="confirmToggleActive(wh)" title="Désactiver">
                     <i class="pi pi-ban"></i>
                   </button>
                 } @else {
-                  <button class="btn btn-success btn-sm" (click)="toggleActive(wh)" title="Activer">
+                  <button class="btn btn-success btn-sm" (click)="confirmToggleActive(wh)" title="Activer">
                     <i class="pi pi-check"></i>
                   </button>
                 }
@@ -158,8 +158,60 @@ import { WarehouseDto } from '../../models/stock.models';
           </div>
         </div>
       }
+
+      <!-- Confirmation Dialog -->
+      @if (itemToDeactivate()) {
+        <div class="modal-overlay">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper">
+              <i class="pi pi-exclamation-triangle"></i>
+            </div>
+            <h2 class="modal-title">Désactiver l'entrepôt</h2>
+            <p class="confirm-message">
+              Êtes-vous sûr de vouloir désactiver l'entrepôt <strong>{{ itemToDeactivate()?.name }}</strong> ?<br>
+              Il ne pourra plus être utilisé pour de nouvelles transactions de stock.
+            </p>
+            <div class="modal-footer" style="justify-content:center;margin-top:24px;">
+              <button class="btn btn-secondary" (click)="cancelDeactivate()">Annuler</button>
+              <button class="btn btn-danger" (click)="executeDeactivate()" [disabled]="saving()">
+                @if (saving()) { <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> }
+                Oui, désactiver
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
-  `
+  `,
+  styles: [
+    `
+      .confirm-panel {
+        max-width: 400px !important;
+        text-align: center;
+        padding: 32px 24px !important;
+      }
+
+      .confirm-icon-wrapper {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        margin: 0 auto 16px;
+      }
+
+      .confirm-message {
+        color: var(--text-muted);
+        font-size: 14.5px;
+        line-height: 1.5;
+        margin-top: 8px;
+      }
+    `
+  ]
 })
 export class WarehousesComponent implements OnInit {
   private stockService = inject(StockService);
@@ -168,6 +220,7 @@ export class WarehousesComponent implements OnInit {
   saving = signal(false);
   showModal = signal(false);
   editItem = signal<WarehouseDto | null>(null);
+  itemToDeactivate = signal<WarehouseDto | null>(null);
   items = signal<WarehouseDto[]>([]);
   filtered = signal<WarehouseDto[]>([]);
 
@@ -218,8 +271,33 @@ export class WarehousesComponent implements OnInit {
     req.subscribe({ next: () => { this.saving.set(false); this.closeModal(); this.load(); }, error: () => this.saving.set(false) });
   }
 
-  toggleActive(item: WarehouseDto) {
-    const req = item.isActive ? this.stockService.deactivateWarehouse(item.id) : this.stockService.activateWarehouse(item.id);
-    req.subscribe({ next: () => this.load() });
+  confirmToggleActive(item: WarehouseDto) {
+    if (item.isActive) {
+      this.itemToDeactivate.set(item);
+    } else {
+      const req = this.stockService.activateWarehouse(item.id);
+      req.subscribe({ next: () => this.load() });
+    }
+  }
+
+  cancelDeactivate() {
+    this.itemToDeactivate.set(null);
+  }
+
+  executeDeactivate() {
+    const item = this.itemToDeactivate();
+    if (!item) return;
+
+    this.saving.set(true);
+    this.stockService.deactivateWarehouse(item.id).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.itemToDeactivate.set(null);
+        this.load();
+      },
+      error: () => {
+        this.saving.set(false);
+      }
+    });
   }
 }

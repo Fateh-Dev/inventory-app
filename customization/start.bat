@@ -1,0 +1,6 @@
+@echo off
+echo Starting Backend (.NET Host)...
+start cmd /k "cd Host && dotnet run"
+
+echo Starting Frontend (Angular)...
+start cmd /k "cd frontend && npm start"

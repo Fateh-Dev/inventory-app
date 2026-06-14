@@ -13,6 +13,12 @@ const STATUS_FR: Record<string, string> = {
   Pending: 'En attente', Confirmed: 'Confirmé', Cancelled: 'Annulé'
 };
 
+const UNIT_FR: Record<string, string> = {
+  Piece: 'Pièce', Liter: 'Litre', Kilogram: 'Kilogramme', Meter: 'Mètre',
+  SquareMeter: 'Mètre carré', CubicMeter: 'Mètre cube', Box: 'Carton',
+  Pallet: 'Palette', Roll: 'Rouleau', Bag: 'Sac', Can: 'Bidon', Set: 'Ensemble'
+};
+
 @Component({ 
   selector: 'app-movements',
   standalone: true,
@@ -213,7 +219,7 @@ const STATUS_FR: Record<string, string> = {
       <!-- Modal création de mouvement -->
       @if (showCreateModal()) {
         <div class="modal-overlay">
-          <div class="modal-panel" style="max-width:620px;" (click)="$event.stopPropagation()">
+          <div class="modal-panel" style="max-width:850px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
               <h2 class="modal-title">Nouveau mouvement de stock</h2>
               <button class="modal-close" (click)="showCreateModal.set(false)"><i class="pi pi-times"></i></button>
@@ -326,8 +332,9 @@ const STATUS_FR: Record<string, string> = {
               }
 
               <div style="background:var(--bg-base);padding:12px;border-radius:8px;border:1px solid var(--border);">
-                <div class="form-grid" style="margin-bottom:8px;">
-                  <div class="form-group autocomplete-container" style="position:relative;">
+                <!-- ROW 1: Article and Coût unitaire in same row (if Reception) -->
+                <div style="display:flex; gap:16px; margin-bottom:16px; align-items:flex-start;">
+                  <div class="form-group autocomplete-container" style="position:relative; flex:1; margin:0;">
                     <label class="form-label">Article *</label>
                     <input class="form-input" 
                            [(ngModel)]="itemSearchQuery" 
@@ -336,59 +343,71 @@ const STATUS_FR: Record<string, string> = {
                            (focus)="showSuggestions.set(true)">
                     
                     @if (showSuggestions() && suggestions().length > 0) {
-                      <div class="suggestions-list" style="position:absolute; top:100%; left:0; right:0; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; max-height:220px; overflow-y:auto; z-index:1000; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05); margin-top:4px;">
+                      <div class="suggestions-list" style="position:absolute; bottom:100%; left:0; right:0; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; max-height:220px; overflow-y:auto; z-index:1000; box-shadow:0 -10px 15px -3px rgba(0,0,0,0.1), 0 -4px 6px -2px rgba(0,0,0,0.05); margin-bottom:4px;">
                         @for (item of suggestions(); track item.id) {
                           <div class="suggestion-item" 
                                style="padding:10px 12px; cursor:pointer; border-bottom:1px solid var(--border); transition:background 0.2s;"
                                (click)="selectArticle(item)">
                             <div style="font-weight:600; font-size:13px; color:var(--text-primary);">{{ item.name }}</div>
-                            <div style="font-size:11px; color:var(--accent); font-family:monospace; margin-top:2px;">{{ item.reference }}</div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px; margin-top:2px;">
+                              <span style="color:var(--accent); font-family:monospace;">{{ item.reference }}</span>
+                              <span style="color:var(--text-muted); font-size:11px;">Dispo: <strong style="color:var(--text-primary)">{{ item.totalQuantity }}</strong> {{ unitFr(item.defaultUnit) }}</span>
+                            </div>
                           </div>
                         }
                       </div>
                     }
                     @if (showSuggestions() && suggestions().length === 0 && itemSearchQuery.trim().length >= 2 && !loadingSuggestions()) {
-                      <div style="position:absolute; top:100%; left:0; right:0; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; padding:12px; font-size:13px; color:var(--text-muted); z-index:1000; text-align:center; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); margin-top:4px;">
+                      <div style="position:absolute; bottom:100%; left:0; right:0; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; padding:12px; font-size:13px; color:var(--text-muted); z-index:1000; text-align:center; box-shadow:0 -10px 15px -3px rgba(0,0,0,0.1); margin-bottom:4px;">
                         Aucun article trouvé
                       </div>
                     }
                     @if (loadingSuggestions()) {
-                      <div style="position:absolute; top:100%; left:0; right:0; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; padding:12px; z-index:1000; display:flex; justify-content:center; box-shadow:0 10px 15px -3px rgba(0,0,0,0.1); margin-top:4px;">
+                      <div style="position:absolute; bottom:100%; left:0; right:0; background:var(--bg-base); border:1px solid var(--border); border-radius:6px; padding:12px; z-index:1000; display:flex; justify-content:center; box-shadow:0 -10px 15px -3px rgba(0,0,0,0.1); margin-bottom:4px;">
                         <div class="spinner" style="width:18px; height:18px; border-width:2px;"></div>
                       </div>
                     }
                   </div>
-                  @if (createForm.type !== 'Reception') {
-                    <div class="form-group">
-                      <label class="form-label">Lot source *</label>
-                      <select class="form-select" [(ngModel)]="newLine.stockLotId">
-                        <option value="">Sélectionner...</option>
-                        @for (lot of availableLots(); track lot.id) {
-                          <option [value]="lot.id" [disabled]="createForm.sourceWarehouseId && lot.warehouseId !== createForm.sourceWarehouseId">
-                            {{ lot.lotNumber }} (Dispo: {{ lot.currentQuantity }}) - {{ lot.warehouseName }}
-                          </option>
-                        }
-                      </select>
-                    </div>
-                  } @else {
-                    <div class="form-group">
+
+                  @if (createForm.type === 'Reception') {
+                    <div class="form-group" style="width:160px; min-width:160px; margin:0;">
                       <label class="form-label">Coût unitaire (DZD) *</label>
                       <input type="number" class="form-input" [(ngModel)]="newLine.unitCost" min="0">
                     </div>
+                  }
+                </div>
+
+                <!-- ROW 2: Lot details or Expiry/Serial details -->
+                @if (createForm.type !== 'Reception') {
+                  <div class="form-group" style="margin-bottom:16px;">
+                    <label class="form-label">Lot source *</label>
+                    <select class="form-select" [(ngModel)]="newLine.stockLotId">
+                      <option value="">Sélectionner...</option>
+                      @for (lot of availableLots(); track lot.id) {
+                        <option [value]="lot.id" [disabled]="createForm.sourceWarehouseId && lot.warehouseId !== createForm.sourceWarehouseId">
+                          {{ lot.lotNumber }} (Dispo: {{ lot.currentQuantity }}) - {{ lot.warehouseName }}
+                        </option>
+                      }
+                    </select>
+                  </div>
+                } @else if (getSelectedItem()?.hasExpiryDate || getSelectedItem()?.requiresSerialNumber) {
+                  <div class="form-grid" style="margin-bottom:16px;">
                     @if (getSelectedItem()?.hasExpiryDate) {
-                      <div class="form-group">
+                      <div class="form-group" style="margin:0;">
                         <label class="form-label">Date d'expiration *</label>
                         <input type="date" class="form-input" [(ngModel)]="newLine.expiryDate">
                       </div>
                     }
                     @if (getSelectedItem()?.requiresSerialNumber) {
-                      <div class="form-group">
+                      <div class="form-group" style="margin:0;">
                         <label class="form-label">Numéro de série *</label>
                         <input type="text" class="form-input" [(ngModel)]="newLine.serialNumber" placeholder="N° Série">
                       </div>
                     }
-                  }
-                </div>
+                  </div>
+                }
+
+                <!-- ROW 3: Quantity and Unit (with add button) -->
                 <div style="display:flex;gap:12px;align-items:flex-end;">
                   <div class="form-group" style="flex:1;margin:0;">
                     <label class="form-label">{{ createForm.type === 'Adjustment' ? 'Nouvelle Qté (Absolue) *' : 'Quantité *' }}</label>
@@ -666,6 +685,7 @@ export class MovementsComponent implements OnInit {
 
   typeFr(type: string): string { return TYPE_FR[type] ?? type; }
   statusFr(status: string): string { return STATUS_FR[status] ?? status; }
+  unitFr(u: string): string { return UNIT_FR[u] ?? u; }
 
   getTypeBadge(type: string): string {
     const map: Record<string, string> = {

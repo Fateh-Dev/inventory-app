@@ -93,11 +93,11 @@ import { SupplierDto } from '../../models/stock.models';
                         <i class="pi pi-pencil"></i>
                       </button>
                       @if (s.isActive) {
-                        <button class="btn btn-danger btn-sm" (click)="toggleActive(s)" title="Désactiver">
+                        <button class="btn btn-danger btn-sm" (click)="confirmToggleActive(s)" title="Désactiver">
                           <i class="pi pi-ban"></i>
                         </button>
                       } @else {
-                        <button class="btn btn-success btn-sm" (click)="toggleActive(s)" title="Activer">
+                        <button class="btn btn-success btn-sm" (click)="confirmToggleActive(s)" title="Activer">
                           <i class="pi pi-check"></i>
                         </button>
                       }
@@ -173,8 +173,60 @@ import { SupplierDto } from '../../models/stock.models';
           </div>
         </div>
       }
+
+      <!-- Confirmation Dialog -->
+      @if (itemToDeactivate()) {
+        <div class="modal-overlay">
+          <div class="modal-panel confirm-panel" (click)="$event.stopPropagation()">
+            <div class="confirm-icon-wrapper">
+              <i class="pi pi-exclamation-triangle"></i>
+            </div>
+            <h2 class="modal-title">Désactiver le fournisseur</h2>
+            <p class="confirm-message">
+              Êtes-vous sûr de vouloir désactiver le fournisseur <strong>{{ itemToDeactivate()?.name }}</strong> ?<br>
+              Il n'apparaîtra plus dans les nouvelles sélections.
+            </p>
+            <div class="modal-footer" style="justify-content:center;margin-top:24px;">
+              <button class="btn btn-secondary" (click)="cancelDeactivate()">Annuler</button>
+              <button class="btn btn-danger" (click)="executeDeactivate()" [disabled]="saving()">
+                @if (saving()) { <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> }
+                Oui, désactiver
+              </button>
+            </div>
+          </div>
+        </div>
+      }
     </div>
-  `
+  `,
+  styles: [
+    `
+      .confirm-panel {
+        max-width: 400px !important;
+        text-align: center;
+        padding: 32px 24px !important;
+      }
+
+      .confirm-icon-wrapper {
+        width: 64px;
+        height: 64px;
+        border-radius: 50%;
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 32px;
+        margin: 0 auto 16px;
+      }
+
+      .confirm-message {
+        color: var(--text-muted);
+        font-size: 14.5px;
+        line-height: 1.5;
+        margin-top: 8px;
+      }
+    `
+  ]
 })
 export class SuppliersComponent implements OnInit {
   private stockService = inject(StockService);
@@ -183,6 +235,7 @@ export class SuppliersComponent implements OnInit {
   saving = signal(false);
   showModal = signal(false);
   editItem = signal<SupplierDto | null>(null);
+  itemToDeactivate = signal<SupplierDto | null>(null);
   items = signal<SupplierDto[]>([]);
   filtered = signal<SupplierDto[]>([]);
 
@@ -227,8 +280,33 @@ export class SuppliersComponent implements OnInit {
     req.subscribe({ next: () => { this.saving.set(false); this.closeModal(); this.load(); }, error: () => this.saving.set(false) });
   }
 
-  toggleActive(item: SupplierDto) {
-    const req = item.isActive ? this.stockService.deactivateSupplier(item.id) : this.stockService.activateSupplier(item.id);
-    req.subscribe({ next: () => this.load() });
+  confirmToggleActive(item: SupplierDto) {
+    if (item.isActive) {
+      this.itemToDeactivate.set(item);
+    } else {
+      const req = this.stockService.activateSupplier(item.id);
+      req.subscribe({ next: () => this.load() });
+    }
+  }
+
+  cancelDeactivate() {
+    this.itemToDeactivate.set(null);
+  }
+
+  executeDeactivate() {
+    const item = this.itemToDeactivate();
+    if (!item) return;
+
+    this.saving.set(true);
+    this.stockService.deactivateSupplier(item.id).subscribe({
+      next: () => {
+        this.saving.set(false);
+        this.itemToDeactivate.set(null);
+        this.load();
+      },
+      error: () => {
+        this.saving.set(false);
+      }
+    });
   }
 }
