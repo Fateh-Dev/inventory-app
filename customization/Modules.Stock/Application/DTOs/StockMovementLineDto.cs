@@ -8,7 +8,7 @@ public class StockMovementLineDto
     public Guid StockItemId { get; set; }
     public string StockItemName { get; set; } = string.Empty;
     public string StockItemReference { get; set; } = string.Empty;
-    public Guid StockLotId { get; set; }
+    public Guid? StockLotId { get; set; }
     public string LotNumber { get; set; } = string.Empty;
     public decimal Quantity { get; set; }
     public string Unit { get; set; } = string.Empty;

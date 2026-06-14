@@ -69,9 +69,9 @@ public class StockMovement : AggregateRoot
         return new StockMovement(movementNumber, StockMovementType.Adjustment, warehouseId, null, null, null, date, createdBy, null, notes);
     }
 
-    public void AddLine(Guid stockItemId, Guid stockLotId, Quantity qty, MoneyAmount unitCost, string? notes)
+    public void AddLine(Guid stockItemId, Guid? stockLotId, Quantity qty, MoneyAmount unitCost, DateTime? expiryDate, string? serialNumber, string? notes)
     {
-        var line = new StockMovementLine(Id, stockItemId, stockLotId, qty, unitCost, notes);
+        var line = new StockMovementLine(Id, stockItemId, stockLotId, qty, unitCost, expiryDate, serialNumber, notes);
         _lines.Add(line);
     }
 
@@ -79,6 +79,12 @@ public class StockMovement : AggregateRoot
     {
         if (_lines.Count == 0)
             throw new InvalidOperationException("Cannot confirm a movement with no lines");
+
+        foreach (var line in _lines)
+        {
+            if (Type != StockMovementType.Reception && line.StockLotId == null)
+                throw new InvalidOperationException($"Line for item {line.StockItemId} requires a StockLotId to be confirmed.");
+        }
 
         Status = StockMovementStatus.Confirmed;
         Raise(new StockMovementConfirmedDomainEvent(Id, MovementNumber, Type, DateTime.UtcNow));
@@ -88,5 +94,27 @@ public class StockMovement : AggregateRoot
     {
         Status = StockMovementStatus.Cancelled;
         Raise(new StockMovementCancelledDomainEvent(Id, MovementNumber, DateTime.UtcNow));
+    }
+
+    public void UpdateProperties(DateTime date, string? reference, string? notes)
+    {
+        if (Status != StockMovementStatus.Pending)
+            throw new InvalidOperationException("Only pending movements can be updated.");
+
+        MovementDate = date;
+        Reference = reference;
+        Notes = notes;
+    }
+
+    public void UpdateLines(IEnumerable<StockMovementLine> newLines)
+    {
+        if (Status != StockMovementStatus.Pending)
+            throw new InvalidOperationException("Only pending movements can be updated.");
+
+        _lines.Clear();
+        foreach (var line in newLines)
+        {
+            _lines.Add(new StockMovementLine(Id, line.StockItemId, line.StockLotId, line.Quantity, line.UnitCost, line.ExpiryDate, line.SerialNumber, line.Notes));
+        }
     }
 }

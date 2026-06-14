@@ -6,6 +6,8 @@ using Modules.Stock.Application.StockMovements.Commands.CancelMovement;
 using Modules.Stock.Application.StockMovements.Commands.CreateMovement;
 using Modules.Stock.Application.StockMovements.Queries.GetAllMovements;
 using Modules.Stock.Application.StockMovements.Queries.GetMovementById;
+using Modules.Stock.Application.StockMovements.Commands.UpdateMovement;
+using Modules.Stock.Application.StockMovements.Commands.ConfirmMovement;
 using Modules.Stock.Domain.Enums;
 
 namespace Modules.Stock.Controllers;
@@ -33,6 +35,23 @@ public class StockMovementsController : ControllerBase
     public async Task<IActionResult> Cancel(Guid id, [FromBody] CancelMovementRequest request)
     {
         var result = await _mediator.Send(new CancelMovementCommand(id, request.Reason));
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok();
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateMovementCommand command)
+    {
+        if (id != command.MovementId) return BadRequest("ID mismatch");
+        var result = await _mediator.Send(command);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpPost("{id}/confirm")]
+    public async Task<IActionResult> Confirm(Guid id)
+    {
+        var result = await _mediator.Send(new ConfirmMovementCommand(id));
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok();
     }

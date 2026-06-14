@@ -74,15 +74,12 @@ public class CreateMovementCommandHandler : IRequestHandler<CreateMovementComman
                 return Result<StockMovementDto>.Failure(Error.Validation("Movement.Invalid", "Unknown movement type"));
         }
 
-        var affectedItems = new HashSet<StockItem>();
-
         foreach (var lineReq in request.Lines)
         {
-            var item = await _context.StockItems.Include(i => i.Lots).FirstOrDefaultAsync(i => i.Id == lineReq.StockItemId, cancellationToken);
+            var item = await _context.StockItems.FirstOrDefaultAsync(i => i.Id == lineReq.StockItemId, cancellationToken);
             if (item == null)
                 return Result<StockMovementDto>.Failure(Error.NotFound("StockItem.NotFound", $"Item {lineReq.StockItemId} not found"));
             
-            affectedItems.Add(item);
             var qty = Quantity.Create(lineReq.Quantity, lineReq.Unit);
             var cost = MoneyAmount.Create(lineReq.UnitCost, lineReq.Currency);
 
@@ -93,11 +90,8 @@ public class CreateMovementCommandHandler : IRequestHandler<CreateMovementComman
                 if (item.HasExpiryDate && !lineReq.ExpiryDate.HasValue)
                     return Result<StockMovementDto>.Failure(Error.Validation("StockLot.ExpiryDateRequired", $"Item {item.Reference} requires an expiry date"));
 
-                var lotNum = LotNumber.Create($"LOT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString()[..6].ToUpper()}");
-                var newLot = StockLot.Create(item.Id, request.DestinationWarehouseId.Value, lotNum, qty, cost, lineReq.ExpiryDate, item.DefaultLowStockThreshold, lineReq.SerialNumber);
-                _context.StockLots.Add(newLot);
-                
-                movement.AddLine(item.Id, newLot.Id, qty, cost, lineReq.Notes);
+                // Note: StockLot will be created during Confirmation
+                movement.AddLine(item.Id, null, qty, cost, lineReq.ExpiryDate, lineReq.SerialNumber, lineReq.Notes);
             }
             else
             {
@@ -108,33 +102,14 @@ public class CreateMovementCommandHandler : IRequestHandler<CreateMovementComman
                 if (lot == null)
                     return Result<StockMovementDto>.Failure(Error.NotFound("StockLot.NotFound", $"Lot {lineReq.StockLotId} not found"));
 
-
-                if (request.Type == StockMovementType.Issue || request.Type == StockMovementType.Transfer || request.Type == StockMovementType.Disposal)
-                {
-                    lot.Consume(lineReq.Quantity);
-                }
-                else if (request.Type == StockMovementType.Return)
-                {
-                    lot.Replenish(lineReq.Quantity);
-                }
-                else if (request.Type == StockMovementType.Adjustment)
-                {
-                    lot.Adjust(lineReq.Quantity, request.Notes ?? "Adjustment");
-                }
-
-                movement.AddLine(item.Id, lot.Id, qty, cost, lineReq.Notes);
+                // Note: StockLot will be consumed/replenished during Confirmation
+                movement.AddLine(item.Id, lot.Id, qty, cost, null, null, lineReq.Notes);
             }
         }
 
-        movement.Confirm();
+        // Do NOT call movement.Confirm() here. We want it to stay in Pending state.
         _context.StockMovements.Add(movement);
-        
         await _context.SaveChangesAsync(cancellationToken);
-
-        foreach (var item in affectedItems)
-        {
-            await _alertService.CheckAndCreateAlertsAsync(item, cancellationToken);
-        }
 
         // Simplistic mapping for DTO
         // Fetch names for DTO

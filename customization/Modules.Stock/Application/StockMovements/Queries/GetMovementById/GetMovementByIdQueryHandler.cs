@@ -33,6 +33,12 @@ public class GetMovementByIdQueryHandler : IRequestHandler<GetMovementByIdQuery,
         var supplier = movement.SupplierId.HasValue ? await _context.Suppliers.FindAsync(movement.SupplierId.Value) : null;
         var department = movement.DepartmentId.HasValue ? await _context.Departments.FindAsync(movement.DepartmentId.Value) : null;
 
+        var itemIds = movement.Lines.Select(l => l.StockItemId).Distinct().ToList();
+        var lotIds = movement.Lines.Where(l => l.StockLotId.HasValue).Select(l => l.StockLotId.Value).Distinct().ToList();
+
+        var stockItems = await _context.StockItems.Where(i => itemIds.Contains(i.Id)).ToListAsync(cancellationToken);
+        var stockLots = await _context.StockLots.Where(l => lotIds.Contains(l.Id)).ToListAsync(cancellationToken);
+
         var dto = new StockMovementDto
         {
             Id = movement.Id,
@@ -57,7 +63,10 @@ public class GetMovementByIdQueryHandler : IRequestHandler<GetMovementByIdQuery,
             {
                 Id = l.Id,
                 StockItemId = l.StockItemId,
+                StockItemName = stockItems.FirstOrDefault(i => i.Id == l.StockItemId)?.Name,
+                StockItemReference = stockItems.FirstOrDefault(i => i.Id == l.StockItemId)?.Reference,
                 StockLotId = l.StockLotId,
+                LotNumber = stockLots.FirstOrDefault(lot => lot.Id == l.StockLotId)?.LotNumber,
                 Quantity = l.Quantity.Value,
                 Unit = l.Quantity.Unit.ToString(),
                 UnitCost = l.UnitCost.Amount,

@@ -197,6 +197,8 @@ public static class DbSeeder
                     lot.Id,
                     Quantity.Create(rand.Next(1, 10), unit),
                     MoneyAmount.Create(rand.Next(100, 5000), "DZD"),
+                    null,
+                    null,
                     "Seeded line"
                 );
                 

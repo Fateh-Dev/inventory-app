@@ -69,6 +69,23 @@ public class GetAllMovementsQueryHandler : IRequestHandler<GetAllMovementsQuery,
 
         var movements = await query.ToListAsync(cancellationToken);
 
+        var stockItems = new List<Modules.Stock.Domain.Entities.StockItem>();
+        var stockLots = new List<Modules.Stock.Domain.Entities.StockLot>();
+
+        if (request.IncludeLines && movements.Any())
+        {
+            var itemIds = movements.SelectMany(m => m.Lines).Select(l => l.StockItemId).Distinct().ToList();
+            var lotIds = movements.SelectMany(m => m.Lines).Where(l => l.StockLotId.HasValue).Select(l => l.StockLotId.Value).Distinct().ToList();
+
+            stockItems = await _context.StockItems.Where(i => itemIds.Contains(i.Id)).ToListAsync(cancellationToken);
+            stockLots = await _context.StockLots.Where(l => lotIds.Contains(l.Id)).ToListAsync(cancellationToken);
+
+            foreach (var item in stockItems)
+            {
+                Console.WriteLine($"[DEBUG] FOUND STOCK ITEM: {item.Id} - {item.Name} - {item.Reference}");
+            }
+        }
+
         // Map directly without full joining to Warehouses/Suppliers names to keep it simple, or we could fetch names.
         // For simplicity we will leave Names null if not specifically requested with a heavy join.
         var dtos = movements.Select(m => new StockMovementDto
@@ -91,7 +108,10 @@ public class GetAllMovementsQueryHandler : IRequestHandler<GetAllMovementsQuery,
             {
                 Id = l.Id,
                 StockItemId = l.StockItemId,
+                StockItemName = stockItems.FirstOrDefault(i => i.Id == l.StockItemId)?.Name,
+                StockItemReference = stockItems.FirstOrDefault(i => i.Id == l.StockItemId)?.Reference,
                 StockLotId = l.StockLotId,
+                LotNumber = stockLots.FirstOrDefault(lot => lot.Id == l.StockLotId)?.LotNumber,
                 Quantity = l.Quantity.Value,
                 Unit = l.Quantity.Unit.ToString(),
                 UnitCost = l.UnitCost.Amount,

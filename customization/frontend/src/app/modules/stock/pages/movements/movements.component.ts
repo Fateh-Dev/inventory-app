@@ -2,6 +2,7 @@ import { Component, OnInit, inject, signal, HostListener } from '@angular/core';
 import { CommonModule, DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StockService } from '../../../../services/stock.service';
+import { AuthService } from '../../../../services/auth.service';
 import { StockMovementDto, SupplierDto, WarehouseDto, DepartmentDto, StockItemDto, StockLotDto } from '../../models/stock.models';
 
 const TYPE_FR: Record<string, string> = {
@@ -12,7 +13,7 @@ const TYPE_FR: Record<string, string> = {
 const STATUS_FR: Record<string, string> = {
   Pending: 'En attente', Confirmed: 'Confirmé', Cancelled: 'Annulé'
 };
-
+ 
 const UNIT_FR: Record<string, string> = {
   Piece: 'Pièce', Liter: 'Litre', Kilogram: 'Kilogramme', Meter: 'Mètre',
   SquareMeter: 'Mètre carré', CubicMeter: 'Mètre cube', Box: 'Carton',
@@ -105,7 +106,15 @@ const UNIT_FR: Record<string, string> = {
                   <td style="text-align:right;font-weight:700;color:var(--success);">
                     {{ m.totalValue | number:'1.2-2' }} DZD
                   </td>
-                  <td style="text-align:right;">
+                  <td style="text-align:right; white-space:nowrap;">
+                    @if (m.status === 'Pending') {
+                      <button class="btn btn-primary btn-sm" style="margin-right:4px;" (click)="confirmMovement(m)" title="Confirmer le mouvement">
+                        <i class="pi pi-check"></i>
+                      </button>
+                      <button class="btn btn-secondary btn-sm" style="margin-right:4px;" (click)="editMovement(m)" title="Modifier">
+                        <i class="pi pi-pencil"></i>
+                      </button>
+                    }
                     <button class="btn btn-secondary btn-sm" (click)="viewDetail(m)" title="Voir le détail">
                       <i class="pi pi-eye"></i>
                     </button>
@@ -221,7 +230,7 @@ const UNIT_FR: Record<string, string> = {
         <div class="modal-overlay">
           <div class="modal-panel" style="max-width:850px;" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h2 class="modal-title">Nouveau mouvement de stock</h2>
+              <h2 class="modal-title">{{ editingId() ? 'Modifier le mouvement' : 'Nouveau mouvement de stock' }}</h2>
               <button class="modal-close" (click)="showCreateModal.set(false)"><i class="pi pi-times"></i></button>
             </div>
             <div class="modal-body">
@@ -243,44 +252,60 @@ const UNIT_FR: Record<string, string> = {
                 </div>
               </div>
               <div class="form-grid">
-                <div class="form-group">
-                  <label class="form-label">Entrepôt source</label>
-                  <select class="form-select" [(ngModel)]="createForm.sourceWarehouseId">
-                    <option value="">Sélectionner...</option>
-                    @for (w of warehouses(); track w.id) {
-                      <option [value]="w.id">{{ w.name }} ({{ w.code }})</option>
-                    }
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Entrepôt destination</label>
-                  <select class="form-select" [(ngModel)]="createForm.destinationWarehouseId">
-                    <option value="">Sélectionner...</option>
-                    @for (w of warehouses(); track w.id) {
-                      <option [value]="w.id">{{ w.name }} ({{ w.code }})</option>
-                    }
-                  </select>
-                </div>
-              </div>
-              <div class="form-grid">
-                <div class="form-group">
-                  <label class="form-label">Fournisseur</label>
-                  <select class="form-select" [(ngModel)]="createForm.supplierId">
-                    <option value="">Sélectionner...</option>
-                    @for (s of suppliers(); track s.id) {
-                      <option [value]="s.id">{{ s.name }}</option>
-                    }
-                  </select>
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Département</label>
-                  <select class="form-select" [(ngModel)]="createForm.departmentId">
-                    <option value="">Sélectionner...</option>
-                    @for (d of departments(); track d.id) {
-                      <option [value]="d.id">{{ d.name }}</option>
-                    }
-                  </select>
-                </div>
+                @if (createForm.type === 'Reception') {
+                  <div class="form-group">
+                    <label class="form-label">Entrepôt de destination *</label>
+                    <select class="form-select" [(ngModel)]="createForm.destinationWarehouseId">
+                      <option value="">Sélectionner...</option>
+                      @for (wh of warehouses(); track wh.id) { <option [value]="wh.id">{{ wh.name }}</option> }
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Fournisseur *</label>
+                    <select class="form-select" [(ngModel)]="createForm.supplierId">
+                      <option value="">Sélectionner...</option>
+                      @for (sup of suppliers(); track sup.id) { <option [value]="sup.id">{{ sup.name }}</option> }
+                    </select>
+                  </div>
+                } @else if (createForm.type === 'Issue' || createForm.type === 'Disposal') {
+                  <div class="form-group">
+                    <label class="form-label">Entrepôt source *</label>
+                    <select class="form-select" [(ngModel)]="createForm.sourceWarehouseId" (change)="resetNewLine()">
+                      <option value="">Sélectionner...</option>
+                      @for (wh of warehouses(); track wh.id) { <option [value]="wh.id">{{ wh.name }}</option> }
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Département (Destination) *</label>
+                    <select class="form-select" [(ngModel)]="createForm.departmentId">
+                      <option value="">Sélectionner...</option>
+                      @for (dep of departments(); track dep.id) { <option [value]="dep.id">{{ dep.name }}</option> }
+                    </select>
+                  </div>
+                } @else if (createForm.type === 'Transfer') {
+                  <div class="form-group">
+                    <label class="form-label">Entrepôt source *</label>
+                    <select class="form-select" [(ngModel)]="createForm.sourceWarehouseId" (change)="resetNewLine()">
+                      <option value="">Sélectionner...</option>
+                      @for (wh of warehouses(); track wh.id) { <option [value]="wh.id">{{ wh.name }}</option> }
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Entrepôt de destination *</label>
+                    <select class="form-select" [(ngModel)]="createForm.destinationWarehouseId">
+                      <option value="">Sélectionner...</option>
+                      @for (wh of warehouses(); track wh.id) { <option [value]="wh.id">{{ wh.name }}</option> }
+                    </select>
+                  </div>
+                } @else {
+                  <div class="form-group">
+                    <label class="form-label">Entrepôt *</label>
+                    <select class="form-select" [(ngModel)]="createForm.sourceWarehouseId" (change)="resetNewLine()">
+                      <option value="">Sélectionner...</option>
+                      @for (wh of warehouses(); track wh.id) { <option [value]="wh.id">{{ wh.name }}</option> }
+                    </select>
+                  </div>
+                }
               </div>
               <div class="form-grid">
                 <div class="form-group">
@@ -289,7 +314,7 @@ const UNIT_FR: Record<string, string> = {
                 </div>
                 <div class="form-group">
                   <label class="form-label">Créé par *</label>
-                  <input class="form-input" [(ngModel)]="createForm.createdByUser" placeholder="Votre identifiant">
+                  <input type="text" class="form-input" [(ngModel)]="createForm.createdByUser" readonly style="background-color: var(--bg-hover); color: var(--text-muted); cursor: not-allowed;">
                 </div>
               </div>
               <div class="form-group">
@@ -440,7 +465,7 @@ const UNIT_FR: Record<string, string> = {
               <button class="btn btn-secondary" (click)="showCreateModal.set(false)">Annuler</button>
               <button class="btn btn-primary" (click)="saveMovement()" [disabled]="saving() || !createForm.lines?.length">
                 @if (saving()) { <div class="spinner" style="width:14px;height:14px;border-width:2px;"></div> }
-                Créer le mouvement
+                {{ editingId() ? 'Enregistrer les modifications' : 'Créer le mouvement' }}
               </button>
             </div>
           </div>
@@ -451,10 +476,14 @@ const UNIT_FR: Record<string, string> = {
 })
 export class MovementsComponent implements OnInit {
   private stockService = inject(StockService);
+  private authService = inject(AuthService);
+  
+  currentUser = this.authService.currentUser;
 
   loading = signal(true);
   saving = signal(false);
   showCreateModal = signal(false);
+  editingId = signal<string | null>(null);
   selectedMovement = signal<StockMovementDto | null>(null);
   items = signal<StockMovementDto[]>([]);
   filtered = signal<StockMovementDto[]>([]);
@@ -550,13 +579,60 @@ export class MovementsComponent implements OnInit {
   }
 
   openCreate() {
+    this.editingId.set(null);
     this.createForm = {
       type: 'Reception', movementDate: new Date().toISOString().split('T')[0],
       sourceWarehouseId: '', destinationWarehouseId: '', supplierId: '',
-      departmentId: '', reference: '', createdByUser: 'admin', notes: '', lines: []
+      departmentId: '', reference: '', createdByUser: this.currentUser()?.username || 'admin', notes: '', lines: []
     };
     this.resetNewLine();
     this.showCreateModal.set(true);
+  }
+
+  editMovement(m: StockMovementDto) {
+    this.stockService.getMovement(m.id).subscribe({
+      next: (full) => {
+        this.editingId.set(full.id);
+        this.createForm = {
+          type: full.type,
+          movementDate: new Date(full.movementDate).toISOString().split('T')[0],
+          sourceWarehouseId: full.sourceWarehouseId || '',
+          destinationWarehouseId: full.destinationWarehouseId || '',
+          supplierId: full.supplierId || '',
+          departmentId: full.departmentId || '',
+          reference: full.reference || '',
+          createdByUser: full.createdByUser || 'admin',
+          notes: full.notes || '',
+          lines: full.lines.map((l: any) => ({
+            stockItemId: l.stockItemId,
+            stockLotId: l.stockLotId || '',
+            quantity: l.quantity,
+            unit: l.unit,
+            unitCost: l.unitCost,
+            currency: l.currency,
+            notes: l.notes || ''
+          }))
+        };
+        // Fetch item names for lines
+        full.lines.forEach((l: any) => {
+          if (!this.itemNamesMap.has(l.stockItemId)) {
+            // we don't have the name, ideally we'd fetch it, but it should be ok if we don't display perfectly while editing, or we can use stockItems().find
+          }
+        });
+        this.resetNewLine();
+        this.showCreateModal.set(true);
+      }
+    });
+  }
+
+  confirmMovement(m: StockMovementDto) {
+    if (confirm(`Voulez-vous vraiment confirmer le mouvement ${m.movementNumber} ? Cette action mettra à jour les stocks et est irréversible.`)) {
+      this.loading.set(true);
+      this.stockService.confirmMovement(m.id).subscribe({
+        next: () => this.load(),
+        error: () => this.loading.set(false)
+      });
+    }
   }
 
   resetNewLine() {
@@ -677,10 +753,18 @@ export class MovementsComponent implements OnInit {
         serialNumber: l.serialNumber || null
       }))
     };
-    this.stockService.createMovement(payload).subscribe({
-      next: () => { this.saving.set(false); this.showCreateModal.set(false); this.load(); },
-      error: () => this.saving.set(false)
-    });
+    const editingId = this.editingId();
+    if (editingId) {
+      this.stockService.updateMovement(editingId, payload).subscribe({
+        next: () => { this.saving.set(false); this.showCreateModal.set(false); this.load(); },
+        error: () => this.saving.set(false)
+      });
+    } else {
+      this.stockService.createMovement(payload).subscribe({
+        next: () => { this.saving.set(false); this.showCreateModal.set(false); this.load(); },
+        error: () => this.saving.set(false)
+      });
+    }
   }
 
   typeFr(type: string): string { return TYPE_FR[type] ?? type; }

@@ -166,6 +166,14 @@ export class StockService {
     return this.http.post<StockMovementDto>(`${this.base}/StockMovements`, data);
   }
 
+  updateMovement(id: string, data: any): Observable<StockMovementDto> {
+    return this.http.put<StockMovementDto>(`${this.base}/StockMovements/${id}`, { movementId: id, ...data });
+  }
+
+  confirmMovement(id: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/StockMovements/${id}/confirm`, {});
+  }
+
   cancelMovement(id: string, reason: string): Observable<void> {
     return this.http.post<void>(`${this.base}/StockMovements/${id}/cancel`, { reason });
   }
